@@ -143,7 +143,18 @@
                 </div>
                 <div class="charts-container">
                     <div class="chart-card">
-                        <h3>Blood Sugar Trend (Last 7 Days)</h3>
+                        <div class="chart-header">
+                            <h3>Blood Sugar Trend</h3>
+                            <div class="chart-controls">
+                                <select id="bloodSugarRangeFilter" class="range-filter">
+                                    <option value="7">Last 7 Days</option>
+                                    <option value="14">Last 14 Days</option>
+                                    <option value="30">Last 30 Days</option>
+                                    <option value="90">Last 90 Days</option>
+                                    <option value="all" selected>All Data</option>
+                                </select>
+                            </div>
+                        </div>
                         <canvas id="bloodSugarChart"></canvas>
                     </div>
                     <div class="chart-card">

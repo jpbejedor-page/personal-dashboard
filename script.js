@@ -492,6 +492,14 @@ const Overview = {
     init() {
         this.updateStats();
         this.initCharts();
+        
+        // Add event listener for blood sugar range filter
+        const rangeFilter = document.getElementById('bloodSugarRangeFilter');
+        if (rangeFilter) {
+            rangeFilter.addEventListener('change', (e) => {
+                this.createBloodSugarChart(e.target.value);
+            });
+        }
     },
     
     updateStats() {
@@ -536,16 +544,31 @@ const Overview = {
         this.createFinancialChart();
     },
     
-    createBloodSugarChart() {
+    createBloodSugarChart(daysFilter = 'all') {
         const canvas = document.getElementById('bloodSugarChart');
         if (!canvas) return;
         
         const ctx = canvas.getContext('2d');
         
-        // Get last 7 days of data
-        const last7Days = AppState.data.bloodSugar.slice(-7);
-        const labels = last7Days.map(item => Utils.formatDate(item.datetime, 'MM/DD'));
-        const data = last7Days.map(item => parseFloat(item.level));
+        // Filter data based on selected range
+        let filteredData = [...AppState.data.bloodSugar];
+        
+        if (daysFilter !== 'all') {
+            const days = parseInt(daysFilter);
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - days);
+            
+            filteredData = filteredData.filter(item => {
+                const itemDate = new Date(item.datetime);
+                return itemDate >= cutoffDate;
+            });
+        }
+        
+        // Sort by date
+        filteredData.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+        
+        const labels = filteredData.map(item => Utils.formatDate(item.datetime, 'MM/DD HH:mm'));
+        const data = filteredData.map(item => parseFloat(item.level));
         
         if (AppState.charts.bloodSugar) {
             AppState.charts.bloodSugar.destroy();
@@ -561,7 +584,9 @@ const Overview = {
                     borderColor: CONFIG.app.chartColors.warning,
                     backgroundColor: 'rgba(245, 158, 11, 0.1)',
                     tension: 0.4,
-                    fill: true
+                    fill: true,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
                 }]
             },
             options: {
@@ -570,13 +595,30 @@ const Overview = {
                 plugins: {
                     legend: {
                         display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `Blood Sugar: ${context.parsed.y} mg/dL`;
+                            }
+                        }
                     }
                 },
                 scales: {
                     y: {
                         beginAtZero: false,
                         min: 50,
-                        max: 200
+                        max: 200,
+                        title: {
+                            display: true,
+                            text: 'mg/dL'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
                     }
                 }
             }
