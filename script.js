@@ -170,90 +170,7 @@ const Modal = {
 };
 
 // ===================================
-// API Service
-// ===================================
-const API = {
-    async request(action, data = {}) {
-        try {
-            const response = await fetch(CONFIG.api.baseUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ action, ...data })
-            });
-            
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            
-            const result = await response.json();
-            
-            if (result.error) {
-                throw new Error(result.error);
-            }
-            
-            return result;
-        } catch (error) {
-            console.error('API Error:', error);
-            throw error;
-        }
-    },
-    
-    // Blood Sugar API
-    async getBloodSugar() {
-        return this.request('getBloodSugar');
-    },
-    
-    async addBloodSugar(data) {
-        return this.request('addBloodSugar', { data });
-    },
-    
-    async updateBloodSugar(id, data) {
-        return this.request('updateBloodSugar', { id, data });
-    },
-    
-    async deleteBloodSugar(id) {
-        return this.request('deleteBloodSugar', { id });
-    },
-    
-    // Financial API
-    async getFinancial() {
-        return this.request('getFinancial');
-    },
-    
-    async addFinancial(data) {
-        return this.request('addFinancial', { data });
-    },
-    
-    async updateFinancial(id, data) {
-        return this.request('updateFinancial', { id, data });
-    },
-    
-    async deleteFinancial(id) {
-        return this.request('deleteFinancial', { id });
-    },
-    
-    // Lending API
-    async getLending() {
-        return this.request('getLending');
-    },
-    
-    async addLending(data) {
-        return this.request('addLending', { data });
-    },
-    
-    async updateLending(id, data) {
-        return this.request('updateLending', { id, data });
-    },
-    
-    async deleteLending(id) {
-        return this.request('deleteLending', { id });
-    }
-};
-
-// ===================================
-// Mock API (for testing without Google Sheets)
+// Mock API (for offline/testing mode)
 // ===================================
 const MockAPI = {
     data: {
@@ -365,15 +282,9 @@ let DataAPI;
 if (typeof CONFIG !== 'undefined' && CONFIG.databaseType === 'firebase' && typeof FirebaseAPI !== 'undefined') {
     DataAPI = FirebaseAPI;
     console.log('Using Firebase Realtime Database');
-} else if (typeof CONFIG !== 'undefined' && CONFIG.databaseType === 'mock') {
+} else {
     DataAPI = MockAPI;
     console.log('Using Mock API (offline mode)');
-} else if (!CONFIG.api.baseUrl || CONFIG.api.baseUrl.includes('YOUR_GOOGLE')) {
-    DataAPI = MockAPI;
-    console.log('Using Mock API (no backend configured)');
-} else {
-    DataAPI = API;
-    console.log('Using Google Sheets API');
 }
 
 // ===================================

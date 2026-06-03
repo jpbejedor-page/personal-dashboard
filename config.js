@@ -33,21 +33,6 @@ const CONFIG = {
     // Database Type: 'firebase' or 'mock'
     databaseType: 'firebase', // Change to 'mock' to use offline mode
     
-    // Google Sheets API Configuration (Legacy - kept for reference)
-    api: {
-        // Replace with your Google Apps Script Web App URL
-        baseUrl: 'https://script.google.com/macros/s/AKfycbz7AWT_J01uSK5jWYt-i_xRB1u2VK5iAO5E3sBU7Jxa9wgcRPU7b0GP9uAeTGQzASvj/exec',
-        // Sheet names
-        sheets: {
-            bloodSugar: 'BloodSugar',
-            financial: 'Financial',
-            lending: 'Lending'
-        },
-        
-        // API timeout (in milliseconds)
-        timeout: 10000
-    },
-    
     // Application Settings
     app: {
         name: 'Personal Dashboard',
