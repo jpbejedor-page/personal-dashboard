@@ -1584,7 +1584,7 @@ const Budget = {
     currentBudget: null,
     
     init() {
-        this.populateMonthSelector();
+        this.populateYearSelector();
         this.setupEventListeners();
     },
     
@@ -1593,8 +1593,12 @@ const Budget = {
             this.showAddBudgetModal();
         });
         
-        document.getElementById('budgetMonthSelect').addEventListener('change', (e) => {
-            this.loadBudget(e.target.value);
+        document.getElementById('budgetMonthSelect').addEventListener('change', () => {
+            this.loadSelectedBudget();
+        });
+        
+        document.getElementById('budgetYearSelect').addEventListener('change', () => {
+            this.loadSelectedBudget();
         });
         
         document.getElementById('addAllocationBtn')?.addEventListener('click', () => {
@@ -1602,30 +1606,48 @@ const Budget = {
         });
     },
     
-    populateMonthSelector() {
-        const select = document.getElementById('budgetMonthSelect');
-        const budgets = AppState.data.budget || [];
+    populateYearSelector() {
+        const yearSelect = document.getElementById('budgetYearSelect');
+        const currentYear = new Date().getFullYear();
         
-        // Clear existing options except first
-        select.innerHTML = '<option value="">Select a month...</option>';
+        // Clear existing options
+        yearSelect.innerHTML = '<option value="">Select year...</option>';
         
-        // Add existing budgets
-        budgets.forEach(budget => {
+        // Add years from 5 years ago to 2 years in the future
+        for (let year = currentYear - 5; year <= currentYear + 2; year++) {
             const option = document.createElement('option');
-            option.value = budget.id;
-            option.textContent = budget.month;
-            select.appendChild(option);
-        });
+            option.value = year;
+            option.textContent = year;
+            if (year === currentYear) {
+                option.selected = true;
+            }
+            yearSelect.appendChild(option);
+        }
+        
+        // Set current month
+        const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+        document.getElementById('budgetMonthSelect').value = currentMonth;
+        
+        // Load budget for current month/year
+        this.loadSelectedBudget();
     },
     
-    loadBudget(budgetId) {
-        if (!budgetId) {
+    loadSelectedBudget() {
+        const month = document.getElementById('budgetMonthSelect').value;
+        const year = document.getElementById('budgetYearSelect').value;
+        
+        if (!month || !year) {
             document.getElementById('budgetDisplay').style.display = 'none';
             return;
         }
         
-        const budget = AppState.data.budget.find(b => b.id === budgetId);
-        if (!budget) return;
+        const monthKey = `${year}-${month}`;
+        const budget = AppState.data.budget.find(b => b.monthKey === monthKey);
+        
+        if (!budget) {
+            document.getElementById('budgetDisplay').style.display = 'none';
+            return;
+        }
         
         this.currentBudget = budget;
         document.getElementById('budgetDisplay').style.display = 'block';
@@ -1730,9 +1752,11 @@ const Budget = {
             const result = await DataAPI.addBudget(data);
             AppState.data.budget.push(result.data || { id: Utils.generateId(), ...data });
             
-            this.populateMonthSelector();
-            document.getElementById('budgetMonthSelect').value = result.data?.id || AppState.data.budget[AppState.data.budget.length - 1].id;
-            this.loadBudget(document.getElementById('budgetMonthSelect').value);
+            // Set the selectors to the new budget's month and year
+            const [year, month] = monthInput.split('-');
+            document.getElementById('budgetYearSelect').value = year;
+            document.getElementById('budgetMonthSelect').value = month;
+            this.loadSelectedBudget();
             
             Modal.hide();
             Notification.success('Budget created successfully');
