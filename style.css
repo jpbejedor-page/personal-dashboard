@@ -1228,3 +1228,185 @@ body.dark-mode .blood-sugar-indicator.very-high {
     background-color: #991b1b;
     color: #fca5a5;
 }
+
+
+/* ===================================
+   Payment Schedule Styles
+   =================================== */
+.payment-details {
+    max-width: 100%;
+}
+
+.loan-summary {
+    background-color: var(--bg-secondary);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.loan-summary h4 {
+    margin-top: 0;
+    margin-bottom: var(--spacing-md);
+    color: var(--text-primary);
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm);
+    background-color: var(--bg-primary);
+    border-radius: var(--radius-sm);
+}
+
+.summary-item label {
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.summary-item span {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.payment-schedule {
+    margin-bottom: var(--spacing-lg);
+}
+
+.payment-schedule h4 {
+    margin-bottom: var(--spacing-md);
+    color: var(--text-primary);
+}
+
+.schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: var(--bg-primary);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.schedule-table thead {
+    background-color: var(--bg-tertiary);
+}
+
+.schedule-table th,
+.schedule-table td {
+    padding: var(--spacing-sm) var(--spacing-md);
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.schedule-table th {
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+}
+
+.schedule-table tbody tr:hover {
+    background-color: var(--bg-secondary);
+}
+
+.schedule-table tbody tr.paid {
+    background-color: rgba(16, 185, 129, 0.1);
+}
+
+.schedule-table tbody tr.partial {
+    background-color: rgba(245, 158, 11, 0.1);
+}
+
+.schedule-table tbody tr.pending {
+    background-color: transparent;
+}
+
+.schedule-date-input,
+.schedule-amount-input {
+    width: 100%;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.schedule-date-input:focus,
+.schedule-amount-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.schedule-date-input:disabled,
+.schedule-amount-input:disabled {
+    background-color: var(--bg-tertiary);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.modal-content.large {
+    max-width: 900px;
+    width: 90%;
+}
+
+/* Dark mode adjustments */
+body.dark-mode .loan-summary {
+    background-color: var(--bg-dark);
+}
+
+body.dark-mode .summary-item {
+    background-color: #2d3748;
+}
+
+body.dark-mode .schedule-table {
+    background-color: #2d3748;
+}
+
+body.dark-mode .schedule-table thead {
+    background-color: #1a202c;
+}
+
+body.dark-mode .schedule-table tbody tr:hover {
+    background-color: #374151;
+}
+
+body.dark-mode .schedule-date-input,
+body.dark-mode .schedule-amount-input {
+    background-color: #2d3748;
+    border-color: #4a5568;
+    color: var(--text-light);
+}
+
+body.dark-mode .schedule-date-input:disabled,
+body.dark-mode .schedule-amount-input:disabled {
+    background-color: #1a202c;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .summary-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .schedule-table {
+        font-size: 0.875rem;
+    }
+    
+    .schedule-table th,
+    .schedule-table td {
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+    
+    .modal-content.large {
+        width: 95%;
+        max-width: none;
+    }
+}

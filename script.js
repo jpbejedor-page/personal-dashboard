@@ -134,10 +134,19 @@ const Notification = {
 // Modal System
 // ===================================
 const Modal = {
-    show(title, content) {
+    show(title, content, size = 'normal') {
         const modal = document.getElementById('modalContainer');
+        const modalContent = modal.querySelector('.modal-content');
         const modalTitle = document.getElementById('modalTitle');
         const modalBody = document.getElementById('modalBody');
+        
+        // Remove any existing size classes
+        modalContent.classList.remove('large', 'normal');
+        
+        // Add size class
+        if (size === 'large') {
+            modalContent.classList.add('large');
+        }
         
         modalTitle.textContent = title;
         modalBody.innerHTML = content;
@@ -149,7 +158,12 @@ const Modal = {
     
     hide() {
         const modal = document.getElementById('modalContainer');
+        const modalContent = modal.querySelector('.modal-content');
         modal.style.display = 'none';
+        
+        // Remove size classes
+        modalContent.classList.remove('large', 'normal');
+        
         document.body.style.overflow = '';
     }
 };
@@ -1198,36 +1212,65 @@ const Lending = {
         });
     },
     
+    calculateLoanDetails(loan) {
+        const principal = parseFloat(loan.principal || 0);
+        const interestRate = parseFloat(loan.interestRate || 0);
+        const totalDue = principal + (principal * interestRate / 100);
+        const totalPaid = (loan.payments || []).reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+        const balance = totalDue - totalPaid;
+        
+        return {
+            principal,
+            interestRate,
+            totalDue,
+            totalPaid,
+            balance,
+            isFullyPaid: balance <= 0
+        };
+    },
+    
     renderTable() {
         const tbody = document.getElementById('lendingTableBody');
         const data = AppState.data.lending;
         
         if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No records found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align: center;">No records found</td></tr>';
             return;
         }
         
         tbody.innerHTML = data.map(item => {
-            const dueDate = new Date(item.dueDate);
-            const today = new Date();
-            const isOverdue = dueDate < today && item.status === 'Active';
-            const statusClass = isOverdue ? 'overdue' : item.status.toLowerCase();
+            const details = this.calculateLoanDetails(item);
+            const statusClass = details.isFullyPaid ? 'paid' : 'active';
+            const status = details.isFullyPaid ? 'Fully Paid' : 'Active';
             
             return `
                 <tr>
-                    <td data-label="Borrower">${item.borrower}</td>
-                    <td data-label="Amount">${Utils.formatCurrency(item.amount)}</td>
-                    <td data-label="Interest Rate">${item.interestRate}%</td>
-                    <td data-label="Due Date">${Utils.formatDate(item.dueDate)}</td>
+                    <td data-label="Borrower">
+                        <strong>${item.borrower}</strong>
+                        <br><small>Started: ${Utils.formatDate(item.startDate)}</small>
+                    </td>
+                    <td data-label="Principal">${Utils.formatCurrency(details.principal)}</td>
+                    <td data-label="Interest">${details.interestRate}%</td>
+                    <td data-label="Terms">${item.paymentTerms}</td>
+                    <td data-label="Total Due">${Utils.formatCurrency(details.totalDue)}</td>
+                    <td data-label="Paid">${Utils.formatCurrency(details.totalPaid)}</td>
+                    <td data-label="Balance">
+                        <strong style="color: ${details.balance > 0 ? 'var(--danger-color)' : 'var(--success-color)'}">
+                            ${Utils.formatCurrency(details.balance)}
+                        </strong>
+                    </td>
                     <td data-label="Status">
-                        <span class="status-badge status-${statusClass}">${isOverdue ? 'Overdue' : item.status}</span>
+                        <span class="status-badge status-${statusClass}">${status}</span>
                     </td>
                     <td data-label="Actions">
                         <div class="action-buttons">
-                            <button class="action-btn" onclick="Lending.edit('${item.id}')">
+                            <button class="action-btn" onclick="Lending.viewPayments('${item.id}')" title="View Payments">
+                                <i class="fas fa-list"></i>
+                            </button>
+                            <button class="action-btn" onclick="Lending.edit('${item.id}')" title="Edit">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <button class="action-btn delete" onclick="Lending.delete('${item.id}')">
+                            <button class="action-btn delete" onclick="Lending.delete('${item.id}')" title="Delete">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
@@ -1245,22 +1288,28 @@ const Lending = {
                     <input type="text" id="lendBorrower" required>
                 </div>
                 <div class="form-group">
-                    <label for="lendAmount">Amount *</label>
-                    <input type="number" id="lendAmount" required min="0" step="0.01">
+                    <label for="lendPrincipal">Principal Amount *</label>
+                    <input type="number" id="lendPrincipal" required min="0" step="0.01" placeholder="0.00">
                 </div>
                 <div class="form-group">
                     <label for="lendInterest">Interest Rate (%) *</label>
-                    <input type="number" id="lendInterest" required min="0" step="0.1" value="0">
+                    <input type="number" id="lendInterest" required min="0" step="0.1" value="0" placeholder="0">
                 </div>
                 <div class="form-group">
-                    <label for="lendDueDate">Due Date *</label>
-                    <input type="date" id="lendDueDate" required>
-                </div>
-                <div class="form-group">
-                    <label for="lendStatus">Status *</label>
-                    <select id="lendStatus" required>
-                        ${CONFIG.loanStatus.map(status => `<option value="${status}">${status}</option>`).join('')}
+                    <label for="lendTerms">Payment Terms *</label>
+                    <select id="lendTerms" required>
+                        <option value="Daily">Daily</option>
+                        <option value="Weekly">Weekly</option>
+                        <option value="Monthly" selected>Monthly</option>
                     </select>
+                </div>
+                <div class="form-group">
+                    <label for="lendStartDate">Start Date *</label>
+                    <input type="date" id="lendStartDate" required value="${new Date().toISOString().split('T')[0]}">
+                </div>
+                <div class="form-group">
+                    <label for="lendNotes">Notes</label>
+                    <textarea id="lendNotes" rows="2" placeholder="Optional notes..."></textarea>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Cancel</button>
@@ -1289,24 +1338,28 @@ const Lending = {
                     <input type="text" id="lendBorrower" required value="${record.borrower}">
                 </div>
                 <div class="form-group">
-                    <label for="lendAmount">Amount *</label>
-                    <input type="number" id="lendAmount" required min="0" step="0.01" value="${record.amount}">
+                    <label for="lendPrincipal">Principal Amount *</label>
+                    <input type="number" id="lendPrincipal" required min="0" step="0.01" value="${record.principal}">
                 </div>
                 <div class="form-group">
                     <label for="lendInterest">Interest Rate (%) *</label>
                     <input type="number" id="lendInterest" required min="0" step="0.1" value="${record.interestRate}">
                 </div>
                 <div class="form-group">
-                    <label for="lendDueDate">Due Date *</label>
-                    <input type="date" id="lendDueDate" required value="${record.dueDate}">
+                    <label for="lendTerms">Payment Terms *</label>
+                    <select id="lendTerms" required>
+                        <option value="Daily" ${record.paymentTerms === 'Daily' ? 'selected' : ''}>Daily</option>
+                        <option value="Weekly" ${record.paymentTerms === 'Weekly' ? 'selected' : ''}>Weekly</option>
+                        <option value="Monthly" ${record.paymentTerms === 'Monthly' ? 'selected' : ''}>Monthly</option>
+                    </select>
                 </div>
                 <div class="form-group">
-                    <label for="lendStatus">Status *</label>
-                    <select id="lendStatus" required>
-                        ${CONFIG.loanStatus.map(status => 
-                            `<option value="${status}" ${status === record.status ? 'selected' : ''}>${status}</option>`
-                        ).join('')}
-                    </select>
+                    <label for="lendStartDate">Start Date *</label>
+                    <input type="date" id="lendStartDate" required value="${record.startDate}">
+                </div>
+                <div class="form-group">
+                    <label for="lendNotes">Notes</label>
+                    <textarea id="lendNotes" rows="2">${record.notes || ''}</textarea>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Cancel</button>
@@ -1326,10 +1379,12 @@ const Lending = {
     async save(id = null) {
         const data = {
             borrower: document.getElementById('lendBorrower').value,
-            amount: document.getElementById('lendAmount').value,
+            principal: document.getElementById('lendPrincipal').value,
             interestRate: document.getElementById('lendInterest').value,
-            dueDate: document.getElementById('lendDueDate').value,
-            status: document.getElementById('lendStatus').value
+            paymentTerms: document.getElementById('lendTerms').value,
+            startDate: document.getElementById('lendStartDate').value,
+            notes: document.getElementById('lendNotes').value,
+            payments: id ? AppState.data.lending.find(item => item.id === id)?.payments || [] : []
         };
         
         try {
@@ -1350,6 +1405,260 @@ const Lending = {
         } catch (error) {
             Notification.error('Failed to save loan');
         }
+    },
+    
+    viewPayments(id) {
+        const loan = AppState.data.lending.find(item => item.id === id);
+        if (!loan) return;
+        
+        const details = this.calculateLoanDetails(loan);
+        const payments = loan.payments || [];
+        
+        // Generate payment schedule
+        const schedule = this.generatePaymentSchedule(loan);
+        
+        const content = `
+            <div class="payment-details">
+                <div class="loan-summary">
+                    <h4>${loan.borrower}</h4>
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <label>Principal:</label>
+                            <span>${Utils.formatCurrency(details.principal)}</span>
+                        </div>
+                        <div class="summary-item">
+                            <label>Interest (${details.interestRate}%):</label>
+                            <span>${Utils.formatCurrency(details.totalDue - details.principal)}</span>
+                        </div>
+                        <div class="summary-item">
+                            <label>Total Due:</label>
+                            <span><strong>${Utils.formatCurrency(details.totalDue)}</strong></span>
+                        </div>
+                        <div class="summary-item">
+                            <label>Total Paid:</label>
+                            <span style="color: var(--success-color)">${Utils.formatCurrency(details.totalPaid)}</span>
+                        </div>
+                        <div class="summary-item">
+                            <label>Balance:</label>
+                            <span style="color: ${details.balance > 0 ? 'var(--danger-color)' : 'var(--success-color)'}">
+                                <strong>${Utils.formatCurrency(details.balance)}</strong>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="payment-schedule">
+                    <h4>Payment Schedule (${loan.paymentTerms})</h4>
+                    <table class="schedule-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Due Date</th>
+                                <th>Amount Due</th>
+                                <th>Amount Paid</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${schedule.map((item, index) => `
+                                <tr class="${item.status.toLowerCase()}">
+                                    <td>${index + 1}</td>
+                                    <td>
+                                        <input type="date"
+                                            id="dueDate_${index}"
+                                            value="${item.dueDate}"
+                                            class="schedule-date-input"
+                                            ${item.status === 'Paid' ? 'disabled' : ''}>
+                                    </td>
+                                    <td>${Utils.formatCurrency(item.amountDue)}</td>
+                                    <td>
+                                        <input type="number"
+                                            id="amountPaid_${index}"
+                                            value="${item.amountPaid}"
+                                            step="0.01"
+                                            min="0"
+                                            class="schedule-amount-input"
+                                            ${item.status === 'Paid' ? 'disabled' : ''}>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge status-${item.status.toLowerCase()}">${item.status}</span>
+                                    </td>
+                                    <td>
+                                        ${item.status !== 'Paid' ? `
+                                            <button class="action-btn" onclick="Lending.updatePayment('${id}', ${index})" title="Save">
+                                                <i class="fas fa-save"></i>
+                                            </button>
+                                        ` : ''}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="Lending.addPaymentRow('${id}')">
+                        <i class="fas fa-plus"></i> Add Payment Row
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        Modal.show(`Payment Schedule - ${loan.borrower}`, content, 'large');
+    },
+    
+    generatePaymentSchedule(loan) {
+        const payments = loan.payments || [];
+        const details = this.calculateLoanDetails(loan);
+        const schedule = [];
+        
+        // If no payments exist, create initial schedule
+        if (payments.length === 0) {
+            const amountPerPayment = details.totalDue;
+            schedule.push({
+                dueDate: this.calculateNextDueDate(loan.startDate, loan.paymentTerms, 0),
+                amountDue: amountPerPayment,
+                amountPaid: 0,
+                status: 'Pending'
+            });
+        } else {
+            // Use existing payments
+            let remainingBalance = details.totalDue;
+            payments.forEach((payment, index) => {
+                const paid = parseFloat(payment.amount || 0);
+                remainingBalance -= paid;
+                
+                schedule.push({
+                    dueDate: payment.dueDate,
+                    amountDue: parseFloat(payment.amountDue || 0),
+                    amountPaid: paid,
+                    status: paid >= parseFloat(payment.amountDue || 0) ? 'Paid' : 'Partial'
+                });
+            });
+            
+            // Add pending row if balance remains
+            if (remainingBalance > 0) {
+                schedule.push({
+                    dueDate: this.calculateNextDueDate(loan.startDate, loan.paymentTerms, payments.length),
+                    amountDue: remainingBalance,
+                    amountPaid: 0,
+                    status: 'Pending'
+                });
+            }
+        }
+        
+        return schedule;
+    },
+    
+    calculateNextDueDate(startDate, terms, periodNumber) {
+        const date = new Date(startDate);
+        
+        switch(terms) {
+            case 'Daily':
+                date.setDate(date.getDate() + periodNumber);
+                break;
+            case 'Weekly':
+                date.setDate(date.getDate() + (periodNumber * 7));
+                break;
+            case 'Monthly':
+                date.setMonth(date.getMonth() + periodNumber);
+                break;
+        }
+        
+        return date.toISOString().split('T')[0];
+    },
+    
+    async updatePayment(loanId, paymentIndex) {
+        const loan = AppState.data.lending.find(item => item.id === loanId);
+        if (!loan) return;
+        
+        const dueDate = document.getElementById(`dueDate_${paymentIndex}`).value;
+        const amountPaid = parseFloat(document.getElementById(`amountPaid_${paymentIndex}`).value || 0);
+        
+        if (!loan.payments) loan.payments = [];
+        
+        const schedule = this.generatePaymentSchedule(loan);
+        const amountDue = schedule[paymentIndex].amountDue;
+        
+        // Handle overpayment or underpayment
+        let adjustedAmount = amountPaid;
+        let carryOver = 0;
+        
+        if (amountPaid > amountDue) {
+            // Overpayment - carry to next
+            carryOver = amountPaid - amountDue;
+            adjustedAmount = amountDue;
+        } else if (amountPaid < 0) {
+            // Negative payment - add to next due
+            carryOver = amountPaid;
+            adjustedAmount = 0;
+        }
+        
+        // Update or add payment
+        if (loan.payments[paymentIndex]) {
+            loan.payments[paymentIndex] = {
+                dueDate,
+                amountDue,
+                amount: adjustedAmount
+            };
+        } else {
+            loan.payments.push({
+                dueDate,
+                amountDue,
+                amount: adjustedAmount
+            });
+        }
+        
+        // Handle carry over to next payment
+        if (carryOver !== 0 && paymentIndex + 1 < schedule.length) {
+            const nextAmountDue = schedule[paymentIndex + 1].amountDue - carryOver;
+            if (!loan.payments[paymentIndex + 1]) {
+                loan.payments.push({
+                    dueDate: schedule[paymentIndex + 1].dueDate,
+                    amountDue: nextAmountDue,
+                    amount: 0
+                });
+            } else {
+                loan.payments[paymentIndex + 1].amountDue = nextAmountDue;
+            }
+        }
+        
+        try {
+            await DataAPI.updateLending(loanId, loan);
+            const index = AppState.data.lending.findIndex(item => item.id === loanId);
+            AppState.data.lending[index] = loan;
+            
+            Notification.success('Payment updated successfully');
+            this.viewPayments(loanId); // Refresh the view
+            this.renderTable();
+        } catch (error) {
+            Notification.error('Failed to update payment');
+        }
+    },
+    
+    addPaymentRow(loanId) {
+        const loan = AppState.data.lending.find(item => item.id === loanId);
+        if (!loan) return;
+        
+        if (!loan.payments) loan.payments = [];
+        
+        const details = this.calculateLoanDetails(loan);
+        if (details.balance <= 0) {
+            Notification.info('Loan is already fully paid');
+            return;
+        }
+        
+        const nextDueDate = this.calculateNextDueDate(loan.startDate, loan.paymentTerms, loan.payments.length);
+        
+        loan.payments.push({
+            dueDate: nextDueDate,
+            amountDue: details.balance,
+            amount: 0
+        });
+        
+        this.viewPayments(loanId); // Refresh the view
     },
     
     edit(id) {
