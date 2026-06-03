@@ -12,10 +12,31 @@ const AppState = {
         bloodSugar: [],
         budget: [],
         financial: [],
-        lending: []
+        lending: [],
+        users: []
     },
     charts: {},
-    isLoading: false
+    isLoading: false,
+    
+    // Check if current user has permission for a module
+    hasPermission(module, action = 'view') {
+        if (!this.currentUser) return false;
+        if (this.currentUser.role === 'admin') return true;
+        
+        const permissions = this.currentUser.permissions || {};
+        const modulePerms = permissions[module];
+        
+        if (!modulePerms) return false;
+        if (action === 'view') return modulePerms.view || modulePerms.modify;
+        if (action === 'modify') return modulePerms.modify;
+        
+        return false;
+    },
+    
+    // Check if current user is admin
+    isAdmin() {
+        return this.currentUser && this.currentUser.role === 'admin';
+    }
 };
 
 // ===================================
@@ -458,20 +479,64 @@ const Auth = {
         document.getElementById('exportDataBtn').addEventListener('click', () => this.exportData());
     },
     
-    login() {
+    async login() {
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
         const errorDiv = document.getElementById('loginError');
         
-        if (username === CONFIG.auth.username && password === CONFIG.auth.password) {
-            const user = { username, loginTime: Date.now() };
-            AppState.currentUser = user;
-            localStorage.setItem('currentUser', JSON.stringify(user));
+        try {
+            // Try to authenticate with Firebase users
+            const response = await FirebaseAPI.getUserByUsername(username);
             
-            this.showDashboard();
-            Notification.success('Login successful!');
-        } else {
-            errorDiv.textContent = 'Invalid username or password';
+            if (response.success && response.data) {
+                const user = response.data;
+                
+                // Check password (in production, use proper hashing!)
+                if (user.password === password) {
+                    // Check if user is active
+                    if (user.status !== 'active') {
+                        errorDiv.textContent = 'Your account is inactive. Please contact an administrator.';
+                        errorDiv.style.display = 'block';
+                        return;
+                    }
+                    
+                    // Set current user
+                    AppState.currentUser = {
+                        id: user.id,
+                        username: user.username,
+                        role: user.role,
+                        permissions: user.permissions,
+                        loginTime: Date.now()
+                    };
+                    
+                    localStorage.setItem('currentUser', JSON.stringify(AppState.currentUser));
+                    
+                    this.showDashboard();
+                    Notification.success(`Welcome back, ${user.username}!`);
+                    return;
+                }
+            }
+            
+            // Fallback to config-based auth (for initial admin)
+            if (username === CONFIG.auth.username && password === CONFIG.auth.password) {
+                const user = {
+                    username,
+                    role: 'admin',
+                    permissions: null,
+                    loginTime: Date.now()
+                };
+                AppState.currentUser = user;
+                localStorage.setItem('currentUser', JSON.stringify(user));
+                
+                this.showDashboard();
+                Notification.success('Login successful!');
+            } else {
+                errorDiv.textContent = 'Invalid username or password';
+                errorDiv.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            errorDiv.textContent = 'Login failed. Please try again.';
             errorDiv.style.display = 'block';
         }
     },
@@ -604,10 +669,56 @@ const Auth = {
 // ===================================
 const Dashboard = {
     init() {
+        this.applyPermissions();
         this.setupNavigation();
         this.setupMobileMenu();
         this.setupDarkMode();
         this.loadAllData();
+    },
+    
+    applyPermissions() {
+        const isAdmin = AppState.isAdmin();
+        
+        // Show/hide User Management for admins only
+        const userManagementNav = document.querySelector('.nav-item[data-module="users"]');
+        if (userManagementNav) {
+            userManagementNav.style.display = isAdmin ? 'flex' : 'none';
+        }
+        
+        // If not admin, hide/disable modules based on permissions
+        if (!isAdmin) {
+            const modules = ['overview', 'blood-sugar', 'budget', 'financial', 'lending'];
+            
+            modules.forEach(module => {
+                const hasView = AppState.hasPermission(module, 'view');
+                const hasModify = AppState.hasPermission(module, 'modify');
+                
+                // Hide nav item if no view permission
+                const navItem = document.querySelector(`.nav-item[data-module="${module}"]`);
+                if (navItem) {
+                    navItem.style.display = hasView ? 'flex' : 'none';
+                }
+                
+                // Disable add/edit/delete buttons if no modify permission
+                if (hasView && !hasModify) {
+                    const moduleSection = document.getElementById(`${module}-module`);
+                    if (moduleSection) {
+                        // Disable all action buttons
+                        const addButtons = moduleSection.querySelectorAll('.btn-primary');
+                        addButtons.forEach(btn => {
+                            btn.disabled = true;
+                            btn.title = 'You do not have permission to modify this module';
+                        });
+                        
+                        // Hide action columns in tables
+                        const actionButtons = moduleSection.querySelectorAll('.action-btn');
+                        actionButtons.forEach(btn => {
+                            btn.style.display = 'none';
+                        });
+                    }
+                }
+            });
+        }
     },
     
     setupNavigation() {
@@ -643,10 +754,12 @@ const Dashboard = {
         const titles = {
             overview: 'Overview',
             'blood-sugar': 'Blood Sugar',
+            budget: 'Salary Budget',
             financial: 'Financial',
-            lending: 'Lending Business'
+            lending: 'Lending Business',
+            users: 'User Management'
         };
-        document.querySelector('.mobile-title').textContent = titles[moduleName];
+        document.querySelector('.mobile-title').textContent = titles[moduleName] || 'Dashboard';
         
         AppState.currentModule = moduleName;
     },
@@ -694,24 +807,48 @@ const Dashboard = {
             AppState.isLoading = true;
             
             // Load all data in parallel
-            const [bloodSugar, budget, financial, lending] = await Promise.all([
+            const promises = [
                 DataAPI.getBloodSugar(),
                 DataAPI.getBudget(),
                 DataAPI.getFinancial(),
                 DataAPI.getLending()
-            ]);
+            ];
             
-            AppState.data.bloodSugar = bloodSugar.data || [];
-            AppState.data.budget = budget.data || [];
-            AppState.data.financial = financial.data || [];
-            AppState.data.lending = lending.data || [];
+            // Load users if admin
+            if (AppState.isAdmin()) {
+                promises.push(FirebaseAPI.getUsers());
+            }
             
-            // Initialize modules
-            Overview.init();
-            BloodSugar.init();
-            Budget.init();
-            Financial.init();
-            Lending.init();
+            const results = await Promise.all(promises);
+            
+            AppState.data.bloodSugar = results[0].data || [];
+            AppState.data.budget = results[1].data || [];
+            AppState.data.financial = results[2].data || [];
+            AppState.data.lending = results[3].data || [];
+            
+            if (AppState.isAdmin() && results[4]) {
+                AppState.data.users = results[4].data || [];
+            }
+            
+            // Initialize modules based on permissions
+            if (AppState.hasPermission('overview', 'view')) {
+                Overview.init();
+            }
+            if (AppState.hasPermission('blood-sugar', 'view')) {
+                BloodSugar.init();
+            }
+            if (AppState.hasPermission('budget', 'view')) {
+                Budget.init();
+            }
+            if (AppState.hasPermission('financial', 'view')) {
+                Financial.init();
+            }
+            if (AppState.hasPermission('lending', 'view')) {
+                Lending.init();
+            }
+            if (AppState.isAdmin()) {
+                UserManagement.init();
+            }
             
             AppState.isLoading = false;
         } catch (error) {
@@ -2369,5 +2506,359 @@ const Budget = {
 document.addEventListener('DOMContentLoaded', () => {
     Auth.init();
 });
+
+// ===================================
+// User Management Module
+// ===================================
+const UserManagement = {
+    init() {
+        this.renderTable();
+        this.setupEventListeners();
+    },
+    
+    setupEventListeners() {
+        document.getElementById('addUserBtn')?.addEventListener('click', () => {
+            this.showAddModal();
+        });
+    },
+    
+    renderTable() {
+        const tbody = document.getElementById('usersTableBody');
+        const data = AppState.data.users;
+        
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No users found</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = data.map(user => {
+            const permissionsList = this.formatPermissions(user.permissions);
+            const statusClass = user.status === 'active' ? 'active' : 'inactive';
+            
+            return `
+                <tr>
+                    <td data-label="Username">
+                        <strong>${user.username}</strong>
+                    </td>
+                    <td data-label="Role">
+                        <span class="role-badge role-${user.role}">${user.role}</span>
+                    </td>
+                    <td data-label="Permissions">
+                        <div class="permissions-list">${permissionsList}</div>
+                    </td>
+                    <td data-label="Status">
+                        <span class="status-badge status-${statusClass}">${user.status}</span>
+                    </td>
+                    <td data-label="Created">${Utils.formatDate(user.createdAt)}</td>
+                    <td data-label="Actions">
+                        <div class="action-buttons">
+                            <button class="action-btn" onclick="UserManagement.edit('${user.id}')" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="action-btn delete" onclick="UserManagement.delete('${user.id}')" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+    
+    formatPermissions(permissions) {
+        if (!permissions) return '<span class="text-muted">No permissions</span>';
+        
+        const modules = ['overview', 'blood-sugar', 'budget', 'financial', 'lending'];
+        const perms = [];
+        
+        modules.forEach(module => {
+            const perm = permissions[module];
+            if (perm) {
+                const icon = perm.modify ? '✏️' : '👁️';
+                const label = module.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                perms.push(`${icon} ${label}`);
+            }
+        });
+        
+        return perms.length > 0 ? perms.join('<br>') : '<span class="text-muted">No permissions</span>';
+    },
+    
+    showAddModal() {
+        const content = `
+            <form id="userForm" class="form">
+                <div class="form-group">
+                    <label for="username">Username *</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password *</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="role">Role *</label>
+                    <select id="role" name="role" required>
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="status">Status *</label>
+                    <select id="status" name="status" required>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Module Permissions</label>
+                    <div class="permissions-grid">
+                        ${this.renderPermissionCheckboxes()}
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add User</button>
+                </div>
+            </form>
+        `;
+        
+        Modal.show('Add New User', content, 'large');
+        
+        document.getElementById('userForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleAdd(e.target);
+        });
+        
+        // Show/hide permissions based on role
+        document.getElementById('role').addEventListener('change', (e) => {
+            const permissionsGrid = document.querySelector('.permissions-grid');
+            permissionsGrid.style.display = e.target.value === 'admin' ? 'none' : 'grid';
+        });
+    },
+    
+    renderPermissionCheckboxes() {
+        const modules = [
+            { id: 'overview', name: 'Overview', icon: 'fa-home' },
+            { id: 'blood-sugar', name: 'Blood Sugar', icon: 'fa-heartbeat' },
+            { id: 'budget', name: 'Budget', icon: 'fa-money-bill-wave' },
+            { id: 'financial', name: 'Financial', icon: 'fa-wallet' },
+            { id: 'lending', name: 'Lending', icon: 'fa-hand-holding-usd' }
+        ];
+        
+        return modules.map(module => `
+            <div class="permission-item">
+                <div class="permission-header">
+                    <i class="fas ${module.icon}"></i>
+                    <strong>${module.name}</strong>
+                </div>
+                <div class="permission-options">
+                    <label>
+                        <input type="checkbox" name="perm_${module.id}_view" value="1">
+                        View
+                    </label>
+                    <label>
+                        <input type="checkbox" name="perm_${module.id}_modify" value="1">
+                        Modify
+                    </label>
+                </div>
+            </div>
+        `).join('');
+    },
+    
+    async handleAdd(form) {
+        const formData = new FormData(form);
+        const role = formData.get('role');
+        
+        // Build permissions object
+        const permissions = {};
+        if (role !== 'admin') {
+            const modules = ['overview', 'blood-sugar', 'budget', 'financial', 'lending'];
+            modules.forEach(module => {
+                const view = formData.get(`perm_${module}_view`);
+                const modify = formData.get(`perm_${module}_modify`);
+                
+                if (view || modify) {
+                    permissions[module] = {
+                        view: !!view,
+                        modify: !!modify
+                    };
+                }
+            });
+        }
+        
+        const userData = {
+            username: formData.get('username'),
+            password: formData.get('password'), // In production, hash this!
+            role: role,
+            status: formData.get('status'),
+            permissions: role === 'admin' ? null : permissions
+        };
+        
+        try {
+            await FirebaseAPI.addUser(userData);
+            Notification.success('User added successfully');
+            Modal.hide();
+            await this.loadData();
+        } catch (error) {
+            Notification.error('Failed to add user: ' + error.message);
+        }
+    },
+    
+    async edit(id) {
+        const user = AppState.data.users.find(u => u.id === id);
+        if (!user) return;
+        
+        const content = `
+            <form id="userForm" class="form">
+                <div class="form-group">
+                    <label for="username">Username *</label>
+                    <input type="text" id="username" name="username" value="${user.username}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password (leave blank to keep current)</label>
+                    <input type="password" id="password" name="password">
+                </div>
+                
+                <div class="form-group">
+                    <label for="role">Role *</label>
+                    <select id="role" name="role" required>
+                        <option value="user" ${user.role === 'user' ? 'selected' : ''}>User</option>
+                        <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="status">Status *</label>
+                    <select id="status" name="status" required>
+                        <option value="active" ${user.status === 'active' ? 'selected' : ''}>Active</option>
+                        <option value="inactive" ${user.status === 'inactive' ? 'selected' : ''}>Inactive</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Module Permissions</label>
+                    <div class="permissions-grid">
+                        ${this.renderPermissionCheckboxes(user.permissions)}
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update User</button>
+                </div>
+            </form>
+        `;
+        
+        Modal.show('Edit User', content, 'large');
+        
+        // Pre-check permissions
+        if (user.permissions) {
+            Object.keys(user.permissions).forEach(module => {
+                const perms = user.permissions[module];
+                if (perms.view) {
+                    document.querySelector(`input[name="perm_${module}_view"]`).checked = true;
+                }
+                if (perms.modify) {
+                    document.querySelector(`input[name="perm_${module}_modify"]`).checked = true;
+                }
+            });
+        }
+        
+        document.getElementById('userForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleUpdate(id, e.target);
+        });
+        
+        // Show/hide permissions based on role
+        document.getElementById('role').addEventListener('change', (e) => {
+            const permissionsGrid = document.querySelector('.permissions-grid');
+            permissionsGrid.style.display = e.target.value === 'admin' ? 'none' : 'grid';
+        });
+    },
+    
+    async handleUpdate(id, form) {
+        const formData = new FormData(form);
+        const role = formData.get('role');
+        
+        // Build permissions object
+        const permissions = {};
+        if (role !== 'admin') {
+            const modules = ['overview', 'blood-sugar', 'budget', 'financial', 'lending'];
+            modules.forEach(module => {
+                const view = formData.get(`perm_${module}_view`);
+                const modify = formData.get(`perm_${module}_modify`);
+                
+                if (view || modify) {
+                    permissions[module] = {
+                        view: !!view,
+                        modify: !!modify
+                    };
+                }
+            });
+        }
+        
+        const userData = {
+            username: formData.get('username'),
+            role: role,
+            status: formData.get('status'),
+            permissions: role === 'admin' ? null : permissions
+        };
+        
+        // Only update password if provided
+        const password = formData.get('password');
+        if (password) {
+            userData.password = password; // In production, hash this!
+        }
+        
+        try {
+            await FirebaseAPI.updateUser(id, userData);
+            Notification.success('User updated successfully');
+            Modal.hide();
+            await this.loadData();
+        } catch (error) {
+            Notification.error('Failed to update user: ' + error.message);
+        }
+    },
+    
+    async delete(id) {
+        const user = AppState.data.users.find(u => u.id === id);
+        if (!user) return;
+        
+        // Prevent deleting yourself
+        if (AppState.currentUser && AppState.currentUser.id === id) {
+            Notification.warning('You cannot delete your own account');
+            return;
+        }
+        
+        if (!confirm(`Are you sure you want to delete user "${user.username}"?`)) {
+            return;
+        }
+        
+        try {
+            await FirebaseAPI.deleteUser(id);
+            Notification.success('User deleted successfully');
+            await this.loadData();
+        } catch (error) {
+            Notification.error('Failed to delete user: ' + error.message);
+        }
+    },
+    
+    async loadData() {
+        try {
+            const response = await FirebaseAPI.getUsers();
+            AppState.data.users = response.data;
+            this.renderTable();
+        } catch (error) {
+            console.error('Error loading users:', error);
+            Notification.error('Failed to load users');
+        }
+    }
+};
+
 
 // Made with Bob

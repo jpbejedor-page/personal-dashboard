@@ -12,7 +12,7 @@ A flexible, modular, and responsive static website for tracking blood sugar leve
 
 ### Key Features
 - ✅ Fully responsive design (mobile & desktop optimized)
-- ✅ Simple authentication system
+- ✅ **User Management** - Role-based access control with granular permissions
 - ✅ Firebase Realtime Database integration
 - ✅ Real-time data visualization with charts
 - ✅ Dark mode support
@@ -52,6 +52,7 @@ A flexible, modular, and responsive static website for tracking blood sugar leve
    ├── .github/workflows/              # GitHub Actions
    │   └── backup-data.yml            # Automated backup workflow
    ├── BACKUP_GUIDE.md                 # Backup documentation
+   ├── USER_MANAGEMENT_GUIDE.md        # User management documentation
    ├── FIREBASE_SETUP.md               # Firebase setup guide
    └── README.md                       # Documentation
    ```
@@ -185,6 +186,51 @@ git push -u origin main
 - **Track**: Borrower name, amount, interest rate, due date
 - **Status**: Active, Paid, Overdue, Defaulted
 - **Visual Indicators**: Color-coded status badges
+
+### User Management (Admin Only)
+- **Add Users**: Create new user accounts
+- **Assign Roles**: Admin or User roles
+- **Set Permissions**: Granular control per module (view/modify)
+- **Manage Status**: Activate or deactivate accounts
+- **Security**: Role-based access control
+
+## 👥 User Management
+
+### Roles and Permissions
+
+**Admin Role**:
+- Full access to all modules
+- Can create, edit, and delete users
+- Can assign permissions to other users
+- Bypasses all permission checks
+
+**User Role**:
+- Custom permissions per module
+- Can be granted view or modify access
+- Cannot access user management
+- Permissions set by administrators
+
+### Module Permissions
+
+Each module has two permission levels:
+1. **View**: Read-only access to module data
+2. **Modify**: Full access (add, edit, delete records)
+
+**Available Modules**:
+- Overview
+- Blood Sugar
+- Budget
+- Financial
+- Lending
+
+### Getting Started with User Management
+
+1. **Login as Admin**: Use default credentials (change immediately!)
+2. **Access User Management**: Click "User Management" in sidebar
+3. **Create Users**: Add user accounts with appropriate permissions
+4. **Test Access**: Login with user accounts to verify permissions
+
+**See [USER_MANAGEMENT_GUIDE.md](USER_MANAGEMENT_GUIDE.md) for detailed instructions.**
 
 ## 📊 Data Export & Backup
 

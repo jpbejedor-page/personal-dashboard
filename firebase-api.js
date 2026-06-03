@@ -298,6 +298,100 @@ const FirebaseAPI = {
     
     offLendingChange() {
         this.getRef('lending').off();
+    },
+    
+    // ===================================
+    // User Management API
+    // ===================================
+    async getUsers() {
+        try {
+            const snapshot = await this.getRef('users').once('value');
+            const data = snapshot.val();
+            const records = data ? Object.keys(data).map(key => ({
+                id: key,
+                ...data[key]
+            })) : [];
+            return { data: records };
+        } catch (error) {
+            console.error('Error getting users:', error);
+            throw error;
+        }
+    },
+    
+    async addUser(data) {
+        try {
+            const newRef = this.getRef('users').push();
+            await newRef.set({
+                ...data,
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            });
+            return {
+                success: true,
+                data: { id: newRef.key, ...data }
+            };
+        } catch (error) {
+            console.error('Error adding user:', error);
+            throw error;
+        }
+    },
+    
+    async updateUser(id, data) {
+        try {
+            await this.getRef(`users/${id}`).update({
+                ...data,
+                updatedAt: firebase.database.ServerValue.TIMESTAMP
+            });
+            return { success: true };
+        } catch (error) {
+            console.error('Error updating user:', error);
+            throw error;
+        }
+    },
+    
+    async deleteUser(id) {
+        try {
+            await this.getRef(`users/${id}`).remove();
+            return { success: true };
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            throw error;
+        }
+    },
+    
+    async getUserByUsername(username) {
+        try {
+            const snapshot = await this.getRef('users')
+                .orderByChild('username')
+                .equalTo(username)
+                .once('value');
+            const data = snapshot.val();
+            if (data) {
+                const userId = Object.keys(data)[0];
+                return {
+                    success: true,
+                    data: { id: userId, ...data[userId] }
+                };
+            }
+            return { success: false, data: null };
+        } catch (error) {
+            console.error('Error getting user by username:', error);
+            throw error;
+        }
+    },
+    
+    onUsersChange(callback) {
+        this.getRef('users').on('value', (snapshot) => {
+            const data = snapshot.val();
+            const records = data ? Object.keys(data).map(key => ({
+                id: key,
+                ...data[key]
+            })) : [];
+            callback(records);
+        });
+    },
+    
+    offUsersChange() {
+        this.getRef('users').off();
     }
 };
 
