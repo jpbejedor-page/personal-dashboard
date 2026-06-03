@@ -222,6 +222,15 @@ body {
     background-color: #475569;
 }
 
+.btn-success {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    background-color: #059669;
+}
+
 .btn-google {
     background-color: white;
     color: var(--text-primary);
@@ -424,6 +433,12 @@ body {
 
 .module-header h2 i {
     color: var(--primary-color);
+}
+
+.module-header-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
 }
 
 .module-content {

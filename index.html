@@ -98,6 +98,9 @@
             <section id="overview-module" class="module active">
                 <div class="module-header">
                     <h2><i class="fas fa-home"></i> Overview</h2>
+                    <button class="btn btn-success" id="backupAllDataBtn">
+                        <i class="fas fa-download"></i> Backup All Data
+                    </button>
                 </div>
                 <div class="overview-grid">
                     <div class="stat-card">
@@ -168,9 +171,14 @@
             <section id="blood-sugar-module" class="module">
                 <div class="module-header">
                     <h2><i class="fas fa-heartbeat"></i> Blood Sugar Monitoring</h2>
-                    <button class="btn btn-primary" id="addBloodSugarBtn">
-                        <i class="fas fa-plus"></i> Add Record
-                    </button>
+                    <div class="module-header-actions">
+                        <button class="btn btn-secondary" id="exportBloodSugarBtn">
+                            <i class="fas fa-file-excel"></i> Export to Excel
+                        </button>
+                        <button class="btn btn-primary" id="addBloodSugarBtn">
+                            <i class="fas fa-plus"></i> Add Record
+                        </button>
+                    </div>
                 </div>
                 <div class="module-content">
                     <div class="data-table-container">
@@ -202,9 +210,14 @@
             <section id="budget-module" class="module">
                 <div class="module-header">
                     <h2><i class="fas fa-money-bill-wave"></i> Monthly Salary Budget</h2>
-                    <button class="btn btn-primary" id="addBudgetBtn">
-                        <i class="fas fa-plus"></i> New Budget
-                    </button>
+                    <div class="module-header-actions">
+                        <button class="btn btn-secondary" id="exportBudgetBtn">
+                            <i class="fas fa-file-excel"></i> Export to Excel
+                        </button>
+                        <button class="btn btn-primary" id="addBudgetBtn">
+                            <i class="fas fa-plus"></i> New Budget
+                        </button>
+                    </div>
                 </div>
                 <div class="module-content">
                     <div class="budget-selector">
@@ -285,9 +298,14 @@
             <section id="financial-module" class="module">
                 <div class="module-header">
                     <h2><i class="fas fa-wallet"></i> Financial Tracking</h2>
-                    <button class="btn btn-primary" id="addFinancialBtn">
-                        <i class="fas fa-plus"></i> Add Transaction
-                    </button>
+                    <div class="module-header-actions">
+                        <button class="btn btn-secondary" id="exportFinancialBtn">
+                            <i class="fas fa-file-excel"></i> Export to Excel
+                        </button>
+                        <button class="btn btn-primary" id="addFinancialBtn">
+                            <i class="fas fa-plus"></i> Add Transaction
+                        </button>
+                    </div>
                 </div>
                 <div class="module-filters">
                     <select id="financialCategoryFilter" class="filter-select">
@@ -348,9 +366,14 @@
             <section id="lending-module" class="module">
                 <div class="module-header">
                     <h2><i class="fas fa-hand-holding-usd"></i> Lending Business</h2>
-                    <button class="btn btn-primary" id="addLendingBtn">
-                        <i class="fas fa-plus"></i> Add Loan
-                    </button>
+                    <div class="module-header-actions">
+                        <button class="btn btn-secondary" id="exportLendingBtn">
+                            <i class="fas fa-file-excel"></i> Export to Excel
+                        </button>
+                        <button class="btn btn-primary" id="addLendingBtn">
+                            <i class="fas fa-plus"></i> Add Loan
+                        </button>
+                    </div>
                 </div>
                 <div class="module-content">
                     <div class="data-table-container">
@@ -403,6 +426,7 @@
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <!-- Firebase SDK -->

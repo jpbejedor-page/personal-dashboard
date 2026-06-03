@@ -81,6 +81,146 @@ const Utils = {
         const localDate = new Date(now.getTime() - (offset * 60 * 1000));
         return localDate.toISOString().slice(0, 16);
     }
+,
+    
+    // Export data to XLSX
+    exportToXLSX(data, filename, sheetName = 'Sheet1') {
+        try {
+            // Create a new workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Convert data to worksheet
+            const ws = XLSX.utils.json_to_sheet(data);
+            
+            // Add worksheet to workbook
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            
+            // Generate filename with timestamp
+            const timestamp = this.formatDate(new Date(), 'YYYY-MM-DD_HHmm');
+            const fullFilename = `${filename}_${timestamp}.xlsx`;
+            
+            // Write file
+            XLSX.writeFile(wb, fullFilename);
+            
+            return true;
+        } catch (error) {
+            console.error('Error exporting to XLSX:', error);
+            return false;
+        }
+    },
+    
+    // Backup all data to a single XLSX file with multiple sheets
+    backupAllData() {
+        try {
+            // Create a new workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Blood Sugar Data
+            if (AppState.data.bloodSugar.length > 0) {
+                const bloodSugarData = AppState.data.bloodSugar.map(item => ({
+                    'Date & Time': this.formatDate(item.datetime, CONFIG.app.dateTimeFormat),
+                    'Meal Timing': item.mealTiming === 'fasting' ? 'Fasting' : `${item.mealTiming}h after meal`,
+                    'Level (mg/dL)': item.level,
+                    'Notes': item.notes || ''
+                }));
+                const ws1 = XLSX.utils.json_to_sheet(bloodSugarData);
+                XLSX.utils.book_append_sheet(wb, ws1, 'Blood Sugar');
+            }
+            
+            // Budget Data
+            if (AppState.data.budget.length > 0) {
+                const budgetData = [];
+                AppState.data.budget.forEach(budget => {
+                    budgetData.push({
+                        'Month': budget.monthKey,
+                        'Monthly Salary': parseFloat(budget.salary),
+                        'Category': 'TOTAL',
+                        'Amount': parseFloat(budget.salary),
+                        'Percentage': '100%'
+                    });
+                    
+                    if (budget.allocations && budget.allocations.length > 0) {
+                        budget.allocations.forEach(alloc => {
+                            budgetData.push({
+                                'Month': budget.monthKey,
+                                'Monthly Salary': '',
+                                'Category': alloc.category,
+                                'Amount': parseFloat(alloc.amount),
+                                'Percentage': `${((alloc.amount / budget.salary) * 100).toFixed(2)}%`
+                            });
+                        });
+                    }
+                    
+                    // Add empty row between budgets
+                    budgetData.push({
+                        'Month': '',
+                        'Monthly Salary': '',
+                        'Category': '',
+                        'Amount': '',
+                        'Percentage': ''
+                    });
+                });
+                const ws2 = XLSX.utils.json_to_sheet(budgetData);
+                XLSX.utils.book_append_sheet(wb, ws2, 'Budget');
+            }
+            
+            // Financial Data
+            if (AppState.data.financial.length > 0) {
+                const financialData = AppState.data.financial.map(item => ({
+                    'Date': this.formatDate(item.date),
+                    'Category': item.category,
+                    'Description': item.description,
+                    'Amount': parseFloat(item.amount),
+                    'Status': item.status
+                }));
+                const ws3 = XLSX.utils.json_to_sheet(financialData);
+                XLSX.utils.book_append_sheet(wb, ws3, 'Financial');
+            }
+            
+            // Lending Data
+            if (AppState.data.lending.length > 0) {
+                const lendingData = AppState.data.lending.map(item => {
+                    const principal = parseFloat(item.principal || 0);
+                    const interestRate = parseFloat(item.interestRate || 0);
+                    const totalDue = principal + (principal * interestRate / 100);
+                    const totalPaid = (item.payments || []).reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+                    const balance = totalDue - totalPaid;
+                    
+                    return {
+                        'Borrower': item.borrower,
+                        'Start Date': this.formatDate(item.startDate),
+                        'Principal': principal,
+                        'Interest Rate': `${interestRate}%`,
+                        'Payment Terms': item.paymentTerms,
+                        'Total Due': totalDue,
+                        'Total Paid': totalPaid,
+                        'Balance': balance,
+                        'Status': balance <= 0 ? 'Fully Paid' : 'Active'
+                    };
+                });
+                const ws4 = XLSX.utils.json_to_sheet(lendingData);
+                XLSX.utils.book_append_sheet(wb, ws4, 'Lending');
+            }
+            
+            // Check if there's any data to export
+            if (wb.SheetNames.length === 0) {
+                Notification.warning('No data available to backup');
+                return false;
+            }
+            
+            // Generate filename with timestamp
+            const timestamp = this.formatDate(new Date(), 'YYYY-MM-DD_HHmm');
+            const filename = `dashboard_backup_${timestamp}.xlsx`;
+            
+            // Write file
+            XLSX.writeFile(wb, filename);
+            
+            return true;
+        } catch (error) {
+            console.error('Error backing up data:', error);
+            return false;
+        }
+    }
 };
 
 // ===================================
@@ -492,13 +632,34 @@ const Overview = {
     init() {
         this.updateStats();
         this.initCharts();
-        
+        this.setupEventListeners();
+    },
+    
+    setupEventListeners() {
         // Add event listener for blood sugar range filter
         const rangeFilter = document.getElementById('bloodSugarRangeFilter');
         if (rangeFilter) {
             rangeFilter.addEventListener('change', (e) => {
                 this.createBloodSugarChart(e.target.value);
             });
+        }
+        
+        // Add event listener for backup all data button
+        const backupBtn = document.getElementById('backupAllDataBtn');
+        if (backupBtn) {
+            backupBtn.addEventListener('click', () => {
+                this.backupAllData();
+            });
+        }
+    },
+    
+    backupAllData() {
+        const success = Utils.backupAllData();
+        
+        if (success) {
+            Notification.success('All data backed up successfully!');
+        } else {
+            Notification.error('Failed to backup data');
         }
     },
     
@@ -683,6 +844,37 @@ const BloodSugar = {
         document.getElementById('addBloodSugarBtn').addEventListener('click', () => {
             this.showAddModal();
         });
+        
+        document.getElementById('exportBloodSugarBtn').addEventListener('click', () => {
+            this.exportData();
+        });
+    },
+    
+    exportData() {
+        const data = AppState.data.bloodSugar;
+        
+        if (data.length === 0) {
+            Notification.warning('No data to export');
+            return;
+        }
+        
+        // Prepare data for export
+        const exportData = data.map(item => ({
+            'Date & Time': Utils.formatDate(item.datetime, CONFIG.app.dateTimeFormat),
+            'Meal Timing': this.formatMealTiming(item.mealTiming),
+            'Level (mg/dL)': item.level,
+            'Status': this.getHealthIndicator(item.level, item.mealTiming).label,
+            'Notes': item.notes || ''
+        }));
+        
+        // Export to XLSX
+        const success = Utils.exportToXLSX(exportData, 'blood_sugar_data', 'Blood Sugar Records');
+        
+        if (success) {
+            Notification.success('Data exported successfully!');
+        } else {
+            Notification.error('Failed to export data');
+        }
     },
     
     renderTable() {
@@ -961,10 +1153,41 @@ const Financial = {
             this.showAddModal();
         });
         
+        document.getElementById('exportFinancialBtn').addEventListener('click', () => {
+            this.exportData();
+        });
+        
         // Filters
         document.getElementById('financialCategoryFilter').addEventListener('change', () => this.applyFilters());
         document.getElementById('financialStatusFilter').addEventListener('change', () => this.applyFilters());
         document.getElementById('financialMonthFilter').addEventListener('change', () => this.applyFilters());
+    },
+    
+    exportData() {
+        const data = this.filteredData;
+        
+        if (data.length === 0) {
+            Notification.warning('No data to export');
+            return;
+        }
+        
+        // Prepare data for export
+        const exportData = data.map(item => ({
+            'Date': Utils.formatDate(item.date),
+            'Category': item.category,
+            'Description': item.description,
+            'Amount': parseFloat(item.amount),
+            'Status': item.status
+        }));
+        
+        // Export to XLSX
+        const success = Utils.exportToXLSX(exportData, 'financial_transactions', 'Financial Records');
+        
+        if (success) {
+            Notification.success('Financial data exported successfully!');
+        } else {
+            Notification.error('Failed to export financial data');
+        }
     },
     
     applyFilters() {
@@ -1192,6 +1415,44 @@ const Lending = {
         document.getElementById('addLendingBtn').addEventListener('click', () => {
             this.showAddModal();
         });
+        
+        document.getElementById('exportLendingBtn').addEventListener('click', () => {
+            this.exportData();
+        });
+    },
+    
+    exportData() {
+        const data = AppState.data.lending;
+        
+        if (data.length === 0) {
+            Notification.warning('No data to export');
+            return;
+        }
+        
+        // Prepare data for export
+        const exportData = data.map(item => {
+            const details = this.calculateLoanDetails(item);
+            return {
+                'Borrower': item.borrower,
+                'Start Date': Utils.formatDate(item.startDate),
+                'Principal': parseFloat(details.principal),
+                'Interest Rate': `${details.interestRate}%`,
+                'Payment Terms': item.paymentTerms,
+                'Total Due': parseFloat(details.totalDue),
+                'Total Paid': parseFloat(details.totalPaid),
+                'Balance': parseFloat(details.balance),
+                'Status': details.isFullyPaid ? 'Fully Paid' : 'Active'
+            };
+        });
+        
+        // Export to XLSX
+        const success = Utils.exportToXLSX(exportData, 'lending_business', 'Lending Records');
+        
+        if (success) {
+            Notification.success('Lending data exported successfully!');
+        } else {
+            Notification.error('Failed to export lending data');
+        }
     },
     
     calculateLoanDetails(loan) {
@@ -1635,6 +1896,10 @@ const Budget = {
             this.showAddBudgetModal();
         });
         
+        document.getElementById('exportBudgetBtn').addEventListener('click', () => {
+            this.exportData();
+        });
+        
         document.getElementById('budgetMonthSelect').addEventListener('change', () => {
             this.loadSelectedBudget();
         });
@@ -1646,6 +1911,44 @@ const Budget = {
         document.getElementById('addAllocationBtn')?.addEventListener('click', () => {
             this.showAddAllocationModal();
         });
+    },
+    
+    exportData() {
+        if (!this.currentBudget) {
+            Notification.warning('Please select a budget month to export');
+            return;
+        }
+        
+        const allocations = this.currentBudget.allocations || [];
+        
+        if (allocations.length === 0) {
+            Notification.warning('No allocations to export');
+            return;
+        }
+        
+        // Prepare data for export
+        const exportData = allocations.map(item => ({
+            'Category': item.category,
+            'Amount': parseFloat(item.amount),
+            'Percentage': `${((item.amount / this.currentBudget.salary) * 100).toFixed(2)}%`
+        }));
+        
+        // Add summary row
+        exportData.push({
+            'Category': 'TOTAL',
+            'Amount': parseFloat(this.currentBudget.salary),
+            'Percentage': '100%'
+        });
+        
+        // Export to XLSX
+        const monthYear = this.currentBudget.monthKey;
+        const success = Utils.exportToXLSX(exportData, `budget_${monthYear}`, 'Budget Allocations');
+        
+        if (success) {
+            Notification.success('Budget data exported successfully!');
+        } else {
+            Notification.error('Failed to export budget data');
+        }
     },
     
     populateYearSelector() {
