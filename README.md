@@ -13,11 +13,13 @@ A flexible, modular, and responsive static website for tracking blood sugar leve
 ### Key Features
 - ✅ Fully responsive design (mobile & desktop optimized)
 - ✅ Simple authentication system
-- ✅ Google Sheets integration for data storage
+- ✅ Firebase Realtime Database integration
 - ✅ Real-time data visualization with charts
 - ✅ Dark mode support
 - ✅ CRUD operations for all modules
 - ✅ Filtering and search capabilities
+- ✅ **Excel Export** - Export displayed data to XLSX
+- ✅ **Automated Backups** - Backup all data to GitHub
 - ✅ Toast notifications
 - ✅ Mobile-friendly navigation
 - ✅ Offline-capable (with mock data)
@@ -40,12 +42,18 @@ A flexible, modular, and responsive static website for tracking blood sugar leve
 2. **File Structure**
    ```
    personal-dashboard/
-   ├── index.html              # Main HTML file
-   ├── style.css               # Responsive CSS styles
-   ├── script.js               # Main JavaScript logic
-   ├── config.js               # Configuration file
-   ├── google-apps-script.js   # Google Apps Script backend
-   └── README.md               # Documentation
+   ├── index.html                      # Main HTML file
+   ├── style.css                       # Responsive CSS styles
+   ├── script.js                       # Main JavaScript logic
+   ├── config.js                       # Configuration file
+   ├── firebase-api.js                 # Firebase integration
+   ├── backup-to-github.js             # Backup script
+   ├── backups/                        # Backup files directory
+   ├── .github/workflows/              # GitHub Actions
+   │   └── backup-data.yml            # Automated backup workflow
+   ├── BACKUP_GUIDE.md                 # Backup documentation
+   ├── FIREBASE_SETUP.md               # Firebase setup guide
+   └── README.md                       # Documentation
    ```
 
 ## 📝 Setup Guide
@@ -177,6 +185,46 @@ git push -u origin main
 - **Track**: Borrower name, amount, interest rate, due date
 - **Status**: Active, Paid, Overdue, Defaulted
 - **Visual Indicators**: Color-coded status badges
+
+## 📊 Data Export & Backup
+
+### Export to Excel (XLSX)
+
+Each module has an **"Export to Excel"** button that downloads the currently displayed data:
+
+- **Blood Sugar**: Exports filtered blood sugar records
+- **Budget**: Exports current month's budget allocations
+- **Financial**: Exports filtered financial transactions
+- **Lending**: Exports all lending records
+
+**File Format**: `module_name_YYYY-MM-DD_HHmm.xlsx`
+
+### Backup All Data
+
+The **"Backup All Data"** button (green button in Overview module) downloads ALL data from Firebase:
+
+- Creates a single XLSX file with multiple sheets
+- Includes all modules: Blood Sugar, Budget, Financial, Lending
+- **File Format**: `dashboard_backup_YYYY-MM-DD_HHmm.xlsx`
+
+### Automated GitHub Backup
+
+Set up automated backups to save data directly to your GitHub repository:
+
+1. **Manual Backup**:
+   ```bash
+   node backup-to-github.js
+   git add backups/
+   git commit -m "Backup: $(date +'%Y-%m-%d')"
+   git push
+   ```
+
+2. **Automated Backup** (GitHub Actions):
+   - Runs daily at midnight UTC
+   - Can be triggered manually from Actions tab
+   - Automatically commits backup files to repository
+
+**See [BACKUP_GUIDE.md](BACKUP_GUIDE.md) for detailed instructions.**
 
 ## 🎨 Customization
 

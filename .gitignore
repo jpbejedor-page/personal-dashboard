@@ -46,10 +46,12 @@ node_modules/
 package-lock.json
 yarn.lock
 
-# Backup Files
+# Backup Files (but keep backups/ folder)
 *.bak
 *.backup
 *~
+!backups/
+!backups/*.xlsx
 
 # Personal Notes
 notes.txt
