@@ -1410,3 +1410,33 @@ body.dark-mode .schedule-amount-input:disabled {
         max-width: none;
     }
 }
+
+
+/* Payment checkbox styling */
+.payment-checkbox {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--success-color);
+}
+
+.payment-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* Form row for side-by-side inputs */
+.form-row {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+.form-row .form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+@media (max-width: 768px) {
+    .form-row {
+        flex-direction: column;
+    }
+}

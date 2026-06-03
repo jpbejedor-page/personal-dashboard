@@ -1295,13 +1295,19 @@ const Lending = {
                     <label for="lendInterest">Interest Rate (%) *</label>
                     <input type="number" id="lendInterest" required min="0" step="0.1" value="0" placeholder="0">
                 </div>
-                <div class="form-group">
-                    <label for="lendTerms">Payment Terms *</label>
-                    <select id="lendTerms" required>
-                        <option value="Daily">Daily</option>
-                        <option value="Weekly">Weekly</option>
-                        <option value="Monthly" selected>Monthly</option>
-                    </select>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="lendTermsType">Payment Frequency *</label>
+                        <select id="lendTermsType" required>
+                            <option value="Daily">Daily</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="Monthly" selected>Monthly</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="lendTermsCount">Number of Payments *</label>
+                        <input type="number" id="lendTermsCount" required min="1" value="1" placeholder="e.g., 12">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="lendStartDate">Start Date *</label>
@@ -1313,7 +1319,7 @@ const Lending = {
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="submit" class="btn btn-primary">Create Loan & Generate Schedule</button>
                 </div>
             </form>
         `;
@@ -1345,13 +1351,19 @@ const Lending = {
                     <label for="lendInterest">Interest Rate (%) *</label>
                     <input type="number" id="lendInterest" required min="0" step="0.1" value="${record.interestRate}">
                 </div>
-                <div class="form-group">
-                    <label for="lendTerms">Payment Terms *</label>
-                    <select id="lendTerms" required>
-                        <option value="Daily" ${record.paymentTerms === 'Daily' ? 'selected' : ''}>Daily</option>
-                        <option value="Weekly" ${record.paymentTerms === 'Weekly' ? 'selected' : ''}>Weekly</option>
-                        <option value="Monthly" ${record.paymentTerms === 'Monthly' ? 'selected' : ''}>Monthly</option>
-                    </select>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="lendTermsType">Payment Frequency *</label>
+                        <select id="lendTermsType" required>
+                            <option value="Daily" ${record.paymentTerms === 'Daily' ? 'selected' : ''}>Daily</option>
+                            <option value="Weekly" ${record.paymentTerms === 'Weekly' ? 'selected' : ''}>Weekly</option>
+                            <option value="Monthly" ${record.paymentTerms === 'Monthly' ? 'selected' : ''}>Monthly</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="lendTermsCount">Number of Payments *</label>
+                        <input type="number" id="lendTermsCount" required min="1" value="${record.termsCount || 1}">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="lendStartDate">Start Date *</label>
@@ -1377,14 +1389,36 @@ const Lending = {
     },
     
     async save(id = null) {
+        const principal = parseFloat(document.getElementById('lendPrincipal').value);
+        const interestRate = parseFloat(document.getElementById('lendInterest').value);
+        const termsType = document.getElementById('lendTermsType').value;
+        const termsCount = parseInt(document.getElementById('lendTermsCount').value);
+        const startDate = document.getElementById('lendStartDate').value;
+        
+        // Calculate total due and amount per payment
+        const totalDue = principal + (principal * interestRate / 100);
+        const amountPerPayment = totalDue / termsCount;
+        
+        // Generate payment schedule automatically
+        const payments = [];
+        for (let i = 0; i < termsCount; i++) {
+            payments.push({
+                dueDate: this.calculateNextDueDate(startDate, termsType, i),
+                amountDue: amountPerPayment,
+                amount: 0,
+                status: 'Pending'
+            });
+        }
+        
         const data = {
             borrower: document.getElementById('lendBorrower').value,
-            principal: document.getElementById('lendPrincipal').value,
-            interestRate: document.getElementById('lendInterest').value,
-            paymentTerms: document.getElementById('lendTerms').value,
-            startDate: document.getElementById('lendStartDate').value,
+            principal: principal,
+            interestRate: interestRate,
+            paymentTerms: termsType,
+            termsCount: termsCount,
+            startDate: startDate,
             notes: document.getElementById('lendNotes').value,
-            payments: id ? AppState.data.lending.find(item => item.id === id)?.payments || [] : []
+            payments: id ? AppState.data.lending.find(item => item.id === id)?.payments || payments : payments
         };
         
         try {
@@ -1448,16 +1482,15 @@ const Lending = {
                 </div>
                 
                 <div class="payment-schedule">
-                    <h4>Payment Schedule (${loan.paymentTerms})</h4>
+                    <h4>Payment Schedule (${loan.termsCount} ${loan.paymentTerms} Payments)</h4>
                     <table class="schedule-table">
                         <thead>
                             <tr>
                                 <th>#</th>
                                 <th>Due Date</th>
                                 <th>Amount Due</th>
-                                <th>Amount Paid</th>
                                 <th>Status</th>
-                                <th>Actions</th>
+                                <th>Mark as Paid</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1469,27 +1502,18 @@ const Lending = {
                                             id="dueDate_${index}"
                                             value="${item.dueDate}"
                                             class="schedule-date-input"
-                                            ${item.status === 'Paid' ? 'disabled' : ''}>
+                                            onchange="Lending.updateDueDate('${id}', ${index})">
                                     </td>
-                                    <td>${Utils.formatCurrency(item.amountDue)}</td>
-                                    <td>
-                                        <input type="number"
-                                            id="amountPaid_${index}"
-                                            value="${item.amountPaid}"
-                                            step="0.01"
-                                            min="0"
-                                            class="schedule-amount-input"
-                                            ${item.status === 'Paid' ? 'disabled' : ''}>
-                                    </td>
+                                    <td><strong>${Utils.formatCurrency(item.amountDue)}</strong></td>
                                     <td>
                                         <span class="status-badge status-${item.status.toLowerCase()}">${item.status}</span>
                                     </td>
-                                    <td>
-                                        ${item.status !== 'Paid' ? `
-                                            <button class="action-btn" onclick="Lending.updatePayment('${id}', ${index})" title="Save">
-                                                <i class="fas fa-save"></i>
-                                            </button>
-                                        ` : ''}
+                                    <td style="text-align: center;">
+                                        <input type="checkbox"
+                                            id="paid_${index}"
+                                            ${item.status === 'Paid' ? 'checked' : ''}
+                                            onchange="Lending.togglePaymentStatus('${id}', ${index})"
+                                            class="payment-checkbox">
                                     </td>
                                 </tr>
                             `).join('')}
@@ -1499,9 +1523,6 @@ const Lending = {
                 
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Close</button>
-                    <button type="button" class="btn btn-primary" onclick="Lending.addPaymentRow('${id}')">
-                        <i class="fas fa-plus"></i> Add Payment Row
-                    </button>
                 </div>
             </div>
         `;
@@ -1511,45 +1532,12 @@ const Lending = {
     
     generatePaymentSchedule(loan) {
         const payments = loan.payments || [];
-        const details = this.calculateLoanDetails(loan);
-        const schedule = [];
-        
-        // If no payments exist, create initial schedule
-        if (payments.length === 0) {
-            const amountPerPayment = details.totalDue;
-            schedule.push({
-                dueDate: this.calculateNextDueDate(loan.startDate, loan.paymentTerms, 0),
-                amountDue: amountPerPayment,
-                amountPaid: 0,
-                status: 'Pending'
-            });
-        } else {
-            // Use existing payments
-            let remainingBalance = details.totalDue;
-            payments.forEach((payment, index) => {
-                const paid = parseFloat(payment.amount || 0);
-                remainingBalance -= paid;
-                
-                schedule.push({
-                    dueDate: payment.dueDate,
-                    amountDue: parseFloat(payment.amountDue || 0),
-                    amountPaid: paid,
-                    status: paid >= parseFloat(payment.amountDue || 0) ? 'Paid' : 'Partial'
-                });
-            });
-            
-            // Add pending row if balance remains
-            if (remainingBalance > 0) {
-                schedule.push({
-                    dueDate: this.calculateNextDueDate(loan.startDate, loan.paymentTerms, payments.length),
-                    amountDue: remainingBalance,
-                    amountPaid: 0,
-                    status: 'Pending'
-                });
-            }
-        }
-        
-        return schedule;
+        return payments.map(payment => ({
+            dueDate: payment.dueDate,
+            amountDue: parseFloat(payment.amountDue || 0),
+            amountPaid: parseFloat(payment.amount || 0),
+            status: payment.status || 'Pending'
+        }));
     },
     
     calculateNextDueDate(startDate, terms, periodNumber) {
@@ -1570,59 +1558,20 @@ const Lending = {
         return date.toISOString().split('T')[0];
     },
     
-    async updatePayment(loanId, paymentIndex) {
+    async togglePaymentStatus(loanId, paymentIndex) {
         const loan = AppState.data.lending.find(item => item.id === loanId);
-        if (!loan) return;
+        if (!loan || !loan.payments || !loan.payments[paymentIndex]) return;
         
-        const dueDate = document.getElementById(`dueDate_${paymentIndex}`).value;
-        const amountPaid = parseFloat(document.getElementById(`amountPaid_${paymentIndex}`).value || 0);
+        const payment = loan.payments[paymentIndex];
+        const checkbox = document.getElementById(`paid_${paymentIndex}`);
         
-        if (!loan.payments) loan.payments = [];
-        
-        const schedule = this.generatePaymentSchedule(loan);
-        const amountDue = schedule[paymentIndex].amountDue;
-        
-        // Handle overpayment or underpayment
-        let adjustedAmount = amountPaid;
-        let carryOver = 0;
-        
-        if (amountPaid > amountDue) {
-            // Overpayment - carry to next
-            carryOver = amountPaid - amountDue;
-            adjustedAmount = amountDue;
-        } else if (amountPaid < 0) {
-            // Negative payment - add to next due
-            carryOver = amountPaid;
-            adjustedAmount = 0;
-        }
-        
-        // Update or add payment
-        if (loan.payments[paymentIndex]) {
-            loan.payments[paymentIndex] = {
-                dueDate,
-                amountDue,
-                amount: adjustedAmount
-            };
+        // Toggle status
+        if (checkbox.checked) {
+            payment.status = 'Paid';
+            payment.amount = payment.amountDue;
         } else {
-            loan.payments.push({
-                dueDate,
-                amountDue,
-                amount: adjustedAmount
-            });
-        }
-        
-        // Handle carry over to next payment
-        if (carryOver !== 0 && paymentIndex + 1 < schedule.length) {
-            const nextAmountDue = schedule[paymentIndex + 1].amountDue - carryOver;
-            if (!loan.payments[paymentIndex + 1]) {
-                loan.payments.push({
-                    dueDate: schedule[paymentIndex + 1].dueDate,
-                    amountDue: nextAmountDue,
-                    amount: 0
-                });
-            } else {
-                loan.payments[paymentIndex + 1].amountDue = nextAmountDue;
-            }
+            payment.status = 'Pending';
+            payment.amount = 0;
         }
         
         try {
@@ -1630,35 +1579,31 @@ const Lending = {
             const index = AppState.data.lending.findIndex(item => item.id === loanId);
             AppState.data.lending[index] = loan;
             
-            Notification.success('Payment updated successfully');
+            Notification.success('Payment status updated');
             this.viewPayments(loanId); // Refresh the view
             this.renderTable();
         } catch (error) {
-            Notification.error('Failed to update payment');
+            Notification.error('Failed to update payment status');
+            checkbox.checked = !checkbox.checked; // Revert checkbox
         }
     },
     
-    addPaymentRow(loanId) {
+    async updateDueDate(loanId, paymentIndex) {
         const loan = AppState.data.lending.find(item => item.id === loanId);
-        if (!loan) return;
+        if (!loan || !loan.payments || !loan.payments[paymentIndex]) return;
         
-        if (!loan.payments) loan.payments = [];
+        const newDueDate = document.getElementById(`dueDate_${paymentIndex}`).value;
+        loan.payments[paymentIndex].dueDate = newDueDate;
         
-        const details = this.calculateLoanDetails(loan);
-        if (details.balance <= 0) {
-            Notification.info('Loan is already fully paid');
-            return;
+        try {
+            await DataAPI.updateLending(loanId, loan);
+            const index = AppState.data.lending.findIndex(item => item.id === loanId);
+            AppState.data.lending[index] = loan;
+            
+            Notification.success('Due date updated');
+        } catch (error) {
+            Notification.error('Failed to update due date');
         }
-        
-        const nextDueDate = this.calculateNextDueDate(loan.startDate, loan.paymentTerms, loan.payments.length);
-        
-        loan.payments.push({
-            dueDate: nextDueDate,
-            amountDue: details.balance,
-            amount: 0
-        });
-        
-        this.viewPayments(loanId); // Refresh the view
     },
     
     edit(id) {
