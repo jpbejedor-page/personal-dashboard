@@ -1708,11 +1708,39 @@ const Budget = {
     },
     
     showAddBudgetModal() {
+        const currentYear = new Date().getFullYear();
+        const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+        
         const content = `
             <form id="budgetForm" class="modal-form">
-                <div class="form-group">
-                    <label for="budgetMonth">Month *</label>
-                    <input type="month" id="budgetMonth" required>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="budgetMonthInput">Month *</label>
+                        <select id="budgetMonthInput" required>
+                            <option value="">Select month...</option>
+                            <option value="01" ${currentMonth === '01' ? 'selected' : ''}>January</option>
+                            <option value="02" ${currentMonth === '02' ? 'selected' : ''}>February</option>
+                            <option value="03" ${currentMonth === '03' ? 'selected' : ''}>March</option>
+                            <option value="04" ${currentMonth === '04' ? 'selected' : ''}>April</option>
+                            <option value="05" ${currentMonth === '05' ? 'selected' : ''}>May</option>
+                            <option value="06" ${currentMonth === '06' ? 'selected' : ''}>June</option>
+                            <option value="07" ${currentMonth === '07' ? 'selected' : ''}>July</option>
+                            <option value="08" ${currentMonth === '08' ? 'selected' : ''}>August</option>
+                            <option value="09" ${currentMonth === '09' ? 'selected' : ''}>September</option>
+                            <option value="10" ${currentMonth === '10' ? 'selected' : ''}>October</option>
+                            <option value="11" ${currentMonth === '11' ? 'selected' : ''}>November</option>
+                            <option value="12" ${currentMonth === '12' ? 'selected' : ''}>December</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="budgetYearInput">Year *</label>
+                        <select id="budgetYearInput" required>
+                            <option value="">Select year...</option>
+                            ${Array.from({length: 8}, (_, i) => currentYear - 5 + i).map(year =>
+                                `<option value="${year}" ${year === currentYear ? 'selected' : ''}>${year}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="budgetSalaryInput">Monthly Salary *</label>
@@ -1734,16 +1762,31 @@ const Budget = {
     },
     
     async saveBudget() {
-        const monthInput = document.getElementById('budgetMonth').value;
+        const month = document.getElementById('budgetMonthInput').value;
+        const year = document.getElementById('budgetYearInput').value;
         const salary = document.getElementById('budgetSalaryInput').value;
         
+        if (!month || !year) {
+            Notification.error('Please select both month and year');
+            return;
+        }
+        
+        const monthKey = `${year}-${month}`;
+        
+        // Check if budget already exists for this month/year
+        const existingBudget = AppState.data.budget.find(b => b.monthKey === monthKey);
+        if (existingBudget) {
+            Notification.error('Budget already exists for this month and year');
+            return;
+        }
+        
         // Format month as "January 2024"
-        const date = new Date(monthInput + '-01');
+        const date = new Date(monthKey + '-01');
         const monthName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         
         const data = {
             month: monthName,
-            monthKey: monthInput,
+            monthKey: monthKey,
             salary: salary,
             allocations: []
         };
@@ -1753,7 +1796,6 @@ const Budget = {
             AppState.data.budget.push(result.data || { id: Utils.generateId(), ...data });
             
             // Set the selectors to the new budget's month and year
-            const [year, month] = monthInput.split('-');
             document.getElementById('budgetYearSelect').value = year;
             document.getElementById('budgetMonthSelect').value = month;
             this.loadSelectedBudget();
