@@ -1,0 +1,64 @@
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary Files
+*.tmp
+*.temp
+.cache/
+
+# Environment Variables (if you add them later)
+.env
+.env.local
+.env.*.local
+
+# Build Files (if you add build process later)
+dist/
+build/
+*.min.js
+*.min.css
+
+# Dependencies (if you add npm later)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Backup Files
+*.bak
+*.backup
+*~
+
+# Personal Notes
+notes.txt
+TODO.txt
+.notes/
+
+# Test Files
+test/
+tests/
+*.test.js
+
+# Made with Bob
