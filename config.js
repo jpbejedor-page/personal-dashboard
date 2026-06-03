@@ -20,10 +20,7 @@ const CONFIG = {
     // Google Sheets API Configuration
     api: {
         // Replace with your Google Apps Script Web App URL
-        // Set to 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL' to use mock data (works without server)
-        // Uncomment the line below when accessing from GitHub Pages (https://jpbejedor-page.github.io/personal-dashboard/)
-        baseUrl: 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL',
-        // baseUrl: 'https://script.google.com/macros/s/AKfycbyCV0HYW7ciX63Fx4aMld2777IXXSvDhqv5507ykVk9xZs3FlZVjDIP4q5FR48FWiBdEA/exec',
+        baseUrl: 'https://script.google.com/macros/s/AKfycbyCV0HYW7ciX63Fx4aMld2777IXXSvDhqv5507ykVk9xZs3FlZVjDIP4q5FR48FWiBdEA/exec',
         
         // Sheet names
         sheets: {
