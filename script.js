@@ -474,9 +474,6 @@ const Auth = {
         // Logout handlers
         document.getElementById('logoutBtn').addEventListener('click', () => this.logout());
         document.getElementById('logoutBtnMobile').addEventListener('click', () => this.logout());
-        
-        // Export data handler
-        document.getElementById('exportDataBtn').addEventListener('click', () => this.exportData());
     },
     
     async login() {
@@ -549,100 +546,6 @@ const Auth = {
         
         // Google OAuth implementation would go here
         Notification.info('Google login feature coming soon!');
-    },
-    
-    exportData() {
-        if (typeof XLSX === 'undefined') {
-            Notification.error('Export library not loaded. Please refresh the page.');
-            return;
-        }
-        
-        try {
-            // Create a new workbook
-            const wb = XLSX.utils.book_new();
-            
-            // Export Blood Sugar data
-            if (AppState.data.bloodSugar.length > 0) {
-                const bloodSugarData = AppState.data.bloodSugar.map(item => ({
-                    'Date & Time': item.datetime,
-                    'Blood Sugar Level (mg/dL)': item.level,
-                    'Meal Timing': item.mealTiming || '',
-                    'Notes': item.notes || ''
-                }));
-                const ws1 = XLSX.utils.json_to_sheet(bloodSugarData);
-                XLSX.utils.book_append_sheet(wb, ws1, 'Blood Sugar');
-            }
-            
-            // Export Budget data
-            if (AppState.data.budget.length > 0) {
-                const budgetData = [];
-                AppState.data.budget.forEach(budget => {
-                    budgetData.push({
-                        'Month': budget.month,
-                        'Monthly Salary': budget.salary,
-                        'Category': '',
-                        'Amount': '',
-                        'Percentage': ''
-                    });
-                    if (budget.allocations && budget.allocations.length > 0) {
-                        budget.allocations.forEach(alloc => {
-                            const percentage = budget.salary > 0 ? ((parseFloat(alloc.amount) / parseFloat(budget.salary)) * 100).toFixed(1) : 0;
-                            budgetData.push({
-                                'Month': '',
-                                'Monthly Salary': '',
-                                'Category': alloc.category,
-                                'Amount': alloc.amount,
-                                'Percentage': percentage + '%'
-                            });
-                        });
-                    }
-                });
-                const ws2 = XLSX.utils.json_to_sheet(budgetData);
-                XLSX.utils.book_append_sheet(wb, ws2, 'Salary Budget');
-            }
-            
-            // Export Financial data
-            if (AppState.data.financial.length > 0) {
-                const financialData = AppState.data.financial.map(item => ({
-                    'Date': item.date,
-                    'Category': item.category,
-                    'Amount': item.amount,
-                    'Description': item.description || '',
-                    'Status': item.status || ''
-                }));
-                const ws3 = XLSX.utils.json_to_sheet(financialData);
-                XLSX.utils.book_append_sheet(wb, ws3, 'Financial');
-            }
-            
-            // Export Lending data
-            if (AppState.data.lending.length > 0) {
-                const lendingData = AppState.data.lending.map(item => ({
-                    'Borrower Name': item.borrowerName,
-                    'Amount': item.amount,
-                    'Interest Rate (%)': item.interestRate,
-                    'Start Date': item.startDate,
-                    'Due Date': item.dueDate,
-                    'Status': item.status,
-                    'Payment Schedule': item.paymentSchedule ? JSON.stringify(item.paymentSchedule) : '',
-                    'Notes': item.notes || ''
-                }));
-                const ws4 = XLSX.utils.json_to_sheet(lendingData);
-                XLSX.utils.book_append_sheet(wb, ws4, 'Lending Business');
-            }
-            
-            // Generate filename with current date
-            const now = new Date();
-            const dateStr = now.toISOString().split('T')[0];
-            const filename = `Dashboard_Backup_${dateStr}.xlsx`;
-            
-            // Write and download the file
-            XLSX.writeFile(wb, filename);
-            
-            Notification.success('Data exported successfully!');
-        } catch (error) {
-            console.error('Export error:', error);
-            Notification.error('Failed to export data. Please try again.');
-        }
     },
     
     logout() {
