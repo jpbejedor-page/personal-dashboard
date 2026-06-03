@@ -21,7 +21,7 @@ const CONFIG = {
     api: {
         // Replace with your Google Apps Script Web App URL
         //baseUrl: 'https://script.google.com/macros/s/AKfycbyCV0HYW7ciX63Fx4aMld2777IXXSvDhqv5507ykVk9xZs3FlZVjDIP4q5FR48FWiBdEA/exec',
-        baseUrl: 'https://script.google.com/macros/s/AKfycbwTWcZ2ks1reU4T5Ka5ie62tTf8tEGB4PeOwDn1t3OEU6wu2D8AM6KV39NisKtsDHS-tg/exec',
+        baseUrl: 'https://script.google.com/macros/s/AKfycbz7AWT_J01uSK5jWYt-i_xRB1u2VK5iAO5E3sBU7Jxa9wgcRPU7b0GP9uAeTGQzASvj/exec',
         // Sheet names
         sheets: {
             bloodSugar: 'BloodSugar',
