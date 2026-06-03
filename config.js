@@ -20,8 +20,8 @@ const CONFIG = {
     // Google Sheets API Configuration
     api: {
         // Replace with your Google Apps Script Web App URL
-        baseUrl: 'https://script.google.com/macros/s/AKfycbyCV0HYW7ciX63Fx4aMld2777IXXSvDhqv5507ykVk9xZs3FlZVjDIP4q5FR48FWiBdEA/exec',
-        
+        //baseUrl: 'https://script.google.com/macros/s/AKfycbyCV0HYW7ciX63Fx4aMld2777IXXSvDhqv5507ykVk9xZs3FlZVjDIP4q5FR48FWiBdEA/exec',
+        baseUrl: 'https://script.google.com/macros/s/AKfycbz81Uerx_kMC9-37-TivqlSVLQ7FNmZwEIzBcfVAPibwIu67WlsyrTLlNZB7RneSHC2yQ/exec',
         // Sheet names
         sheets: {
             bloodSugar: 'BloodSugar',
