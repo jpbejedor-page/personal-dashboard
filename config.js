@@ -17,10 +17,24 @@ const CONFIG = {
         sessionTimeout: 3600000 // 1 hour
     },
     
-    // Google Sheets API Configuration
+    // Firebase Configuration
+    // Get these from Firebase Console: Project Settings > General > Your apps
+    firebase: {
+        apiKey: "YOUR_FIREBASE_API_KEY",
+        authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+        databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_PROJECT_ID.appspot.com",
+        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    },
+    
+    // Database Type: 'firebase' or 'mock'
+    databaseType: 'firebase', // Change to 'mock' to use offline mode
+    
+    // Google Sheets API Configuration (Legacy - kept for reference)
     api: {
         // Replace with your Google Apps Script Web App URL
-        //baseUrl: 'https://script.google.com/macros/s/AKfycbyCV0HYW7ciX63Fx4aMld2777IXXSvDhqv5507ykVk9xZs3FlZVjDIP4q5FR48FWiBdEA/exec',
         baseUrl: 'https://script.google.com/macros/s/AKfycbz7AWT_J01uSK5jWYt-i_xRB1u2VK5iAO5E3sBU7Jxa9wgcRPU7b0GP9uAeTGQzASvj/exec',
         // Sheet names
         sheets: {

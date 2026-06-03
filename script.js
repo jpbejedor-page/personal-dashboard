@@ -320,8 +320,21 @@ const MockAPI = {
     }
 };
 
-// Use MockAPI if Google Sheets URL is not configured
-const DataAPI = (!CONFIG.api.baseUrl || CONFIG.api.baseUrl.includes('YOUR_GOOGLE')) ? MockAPI : API;
+// Select API based on configuration
+let DataAPI;
+if (typeof CONFIG !== 'undefined' && CONFIG.databaseType === 'firebase' && typeof FirebaseAPI !== 'undefined') {
+    DataAPI = FirebaseAPI;
+    console.log('Using Firebase Realtime Database');
+} else if (typeof CONFIG !== 'undefined' && CONFIG.databaseType === 'mock') {
+    DataAPI = MockAPI;
+    console.log('Using Mock API (offline mode)');
+} else if (!CONFIG.api.baseUrl || CONFIG.api.baseUrl.includes('YOUR_GOOGLE')) {
+    DataAPI = MockAPI;
+    console.log('Using Mock API (no backend configured)');
+} else {
+    DataAPI = API;
+    console.log('Using Google Sheets API');
+}
 
 // ===================================
 // Authentication Module
