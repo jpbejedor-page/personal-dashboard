@@ -1440,3 +1440,115 @@ body.dark-mode .schedule-amount-input:disabled {
         flex-direction: column;
     }
 }
+
+
+/* ===================================
+   Budget Module Styles
+   =================================== */
+.budget-selector {
+    margin-bottom: var(--spacing-lg);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.budget-selector label {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.budget-display {
+    display: none;
+}
+
+.budget-summary-card {
+    background-color: var(--bg-secondary);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.budget-summary-card h3 {
+    margin-top: 0;
+    margin-bottom: var(--spacing-md);
+    color: var(--text-primary);
+}
+
+.budget-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.budget-summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-md);
+    background-color: var(--bg-primary);
+    border-radius: var(--radius-sm);
+}
+
+.budget-summary-item label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.budget-amount {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.budget-allocations {
+    margin-top: var(--spacing-lg);
+}
+
+.allocations-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.allocations-header h4 {
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+/* Dark mode adjustments */
+body.dark-mode .budget-summary-card {
+    background-color: var(--bg-dark);
+}
+
+body.dark-mode .budget-summary-item {
+    background-color: #2d3748;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .budget-selector {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .budget-summary-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .allocations-header {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+        align-items: stretch;
+    }
+    
+    .allocations-header .btn-sm {
+        width: 100%;
+    }
+}

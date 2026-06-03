@@ -10,6 +10,7 @@ const AppState = {
     currentModule: 'overview',
     data: {
         bloodSugar: [],
+        budget: [],
         financial: [],
         lending: []
     },
@@ -257,6 +258,7 @@ const API = {
 const MockAPI = {
     data: {
         bloodSugar: [],
+        budget: [],
         financial: [],
         lending: []
     },
@@ -282,6 +284,30 @@ const MockAPI = {
     
     async deleteBloodSugar(id) {
         this.data.bloodSugar = this.data.bloodSugar.filter(item => item.id !== id);
+        return { success: true };
+    },
+    
+    async getBudget() {
+        return { data: this.data.budget };
+    },
+    
+    async addBudget(data) {
+        const record = { id: Utils.generateId(), ...data };
+        this.data.budget.push(record);
+        return { success: true, data: record };
+    },
+    
+    async updateBudget(id, data) {
+        const index = this.data.budget.findIndex(item => item.id === id);
+        if (index !== -1) {
+            this.data.budget[index] = { ...this.data.budget[index], ...data };
+            return { success: true };
+        }
+        return { error: 'Record not found' };
+    },
+    
+    async deleteBudget(id) {
+        this.data.budget = this.data.budget.filter(item => item.id !== id);
         return { success: true };
     },
     
@@ -520,19 +546,22 @@ const Dashboard = {
             AppState.isLoading = true;
             
             // Load all data in parallel
-            const [bloodSugar, financial, lending] = await Promise.all([
+            const [bloodSugar, budget, financial, lending] = await Promise.all([
                 DataAPI.getBloodSugar(),
+                DataAPI.getBudget(),
                 DataAPI.getFinancial(),
                 DataAPI.getLending()
             ]);
             
             AppState.data.bloodSugar = bloodSugar.data || [];
+            AppState.data.budget = budget.data || [];
             AppState.data.financial = financial.data || [];
             AppState.data.lending = lending.data || [];
             
             // Initialize modules
             Overview.init();
             BloodSugar.init();
+            Budget.init();
             Financial.init();
             Lending.init();
             
@@ -1636,6 +1665,284 @@ document.getElementById('modalContainer').addEventListener('click', (e) => {
         Modal.hide();
     }
 });
+
+// ===================================
+// Budget Module
+// ===================================
+const Budget = {
+    currentBudget: null,
+    
+    init() {
+        this.populateMonthSelector();
+        this.setupEventListeners();
+    },
+    
+    setupEventListeners() {
+        document.getElementById('addBudgetBtn').addEventListener('click', () => {
+            this.showAddBudgetModal();
+        });
+        
+        document.getElementById('budgetMonthSelect').addEventListener('change', (e) => {
+            this.loadBudget(e.target.value);
+        });
+        
+        document.getElementById('addAllocationBtn')?.addEventListener('click', () => {
+            this.showAddAllocationModal();
+        });
+    },
+    
+    populateMonthSelector() {
+        const select = document.getElementById('budgetMonthSelect');
+        const budgets = AppState.data.budget || [];
+        
+        // Clear existing options except first
+        select.innerHTML = '<option value="">Select a month...</option>';
+        
+        // Add existing budgets
+        budgets.forEach(budget => {
+            const option = document.createElement('option');
+            option.value = budget.id;
+            option.textContent = budget.month;
+            select.appendChild(option);
+        });
+    },
+    
+    loadBudget(budgetId) {
+        if (!budgetId) {
+            document.getElementById('budgetDisplay').style.display = 'none';
+            return;
+        }
+        
+        const budget = AppState.data.budget.find(b => b.id === budgetId);
+        if (!budget) return;
+        
+        this.currentBudget = budget;
+        document.getElementById('budgetDisplay').style.display = 'block';
+        document.getElementById('budgetMonthTitle').textContent = `Budget for ${budget.month}`;
+        
+        this.updateSummary();
+        this.renderAllocations();
+    },
+    
+    updateSummary() {
+        if (!this.currentBudget) return;
+        
+        const salary = parseFloat(this.currentBudget.salary || 0);
+        const allocations = this.currentBudget.allocations || [];
+        const totalAllocated = allocations.reduce((sum, a) => sum + parseFloat(a.amount || 0), 0);
+        const remaining = salary - totalAllocated;
+        
+        document.getElementById('budgetSalary').textContent = Utils.formatCurrency(salary);
+        document.getElementById('budgetAllocated').textContent = Utils.formatCurrency(totalAllocated);
+        document.getElementById('budgetRemaining').textContent = Utils.formatCurrency(remaining);
+        document.getElementById('budgetRemaining').style.color = 
+            remaining < 0 ? 'var(--danger-color)' : 'var(--success-color)';
+    },
+    
+    renderAllocations() {
+        const tbody = document.getElementById('budgetTableBody');
+        const allocations = this.currentBudget?.allocations || [];
+        
+        if (allocations.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No allocations yet</td></tr>';
+            return;
+        }
+        
+        const salary = parseFloat(this.currentBudget.salary || 0);
+        
+        tbody.innerHTML = allocations.map((allocation, index) => {
+            const amount = parseFloat(allocation.amount || 0);
+            const percentage = salary > 0 ? ((amount / salary) * 100).toFixed(1) : 0;
+            
+            return `
+                <tr>
+                    <td data-label="Category">${allocation.category}</td>
+                    <td data-label="Amount">${Utils.formatCurrency(amount)}</td>
+                    <td data-label="Percentage">${percentage}%</td>
+                    <td data-label="Actions">
+                        <div class="action-buttons">
+                            <button class="action-btn" onclick="Budget.editAllocation(${index})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="action-btn delete" onclick="Budget.deleteAllocation(${index})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+    
+    showAddBudgetModal() {
+        const content = `
+            <form id="budgetForm" class="modal-form">
+                <div class="form-group">
+                    <label for="budgetMonth">Month *</label>
+                    <input type="month" id="budgetMonth" required>
+                </div>
+                <div class="form-group">
+                    <label for="budgetSalaryInput">Monthly Salary *</label>
+                    <input type="number" id="budgetSalaryInput" required min="0" step="0.01" placeholder="0.00">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Budget</button>
+                </div>
+            </form>
+        `;
+        
+        Modal.show('Create Monthly Budget', content);
+        
+        document.getElementById('budgetForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.saveBudget();
+        });
+    },
+    
+    async saveBudget() {
+        const monthInput = document.getElementById('budgetMonth').value;
+        const salary = document.getElementById('budgetSalaryInput').value;
+        
+        // Format month as "January 2024"
+        const date = new Date(monthInput + '-01');
+        const monthName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        
+        const data = {
+            month: monthName,
+            monthKey: monthInput,
+            salary: salary,
+            allocations: []
+        };
+        
+        try {
+            const result = await DataAPI.addBudget(data);
+            AppState.data.budget.push(result.data || { id: Utils.generateId(), ...data });
+            
+            this.populateMonthSelector();
+            document.getElementById('budgetMonthSelect').value = result.data?.id || AppState.data.budget[AppState.data.budget.length - 1].id;
+            this.loadBudget(document.getElementById('budgetMonthSelect').value);
+            
+            Modal.hide();
+            Notification.success('Budget created successfully');
+        } catch (error) {
+            Notification.error('Failed to create budget');
+        }
+    },
+    
+    showAddAllocationModal() {
+        if (!this.currentBudget) return;
+        
+        const content = `
+            <form id="allocationForm" class="modal-form">
+                <div class="form-group">
+                    <label for="allocationCategory">Category/Label *</label>
+                    <input type="text" id="allocationCategory" required placeholder="e.g., Rent, Food, Savings">
+                </div>
+                <div class="form-group">
+                    <label for="allocationAmount">Amount *</label>
+                    <input type="number" id="allocationAmount" required min="0" step="0.01" placeholder="0.00">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Allocation</button>
+                </div>
+            </form>
+        `;
+        
+        Modal.show('Add Budget Allocation', content);
+        
+        document.getElementById('allocationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.saveAllocation();
+        });
+    },
+    
+    showEditAllocationModal(index) {
+        if (!this.currentBudget) return;
+        
+        const allocation = this.currentBudget.allocations[index];
+        
+        const content = `
+            <form id="allocationForm" class="modal-form">
+                <input type="hidden" id="allocationIndex" value="${index}">
+                <div class="form-group">
+                    <label for="allocationCategory">Category/Label *</label>
+                    <input type="text" id="allocationCategory" required value="${allocation.category}">
+                </div>
+                <div class="form-group">
+                    <label for="allocationAmount">Amount *</label>
+                    <input type="number" id="allocationAmount" required min="0" step="0.01" value="${allocation.amount}">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Allocation</button>
+                </div>
+            </form>
+        `;
+        
+        Modal.show('Edit Budget Allocation', content);
+        
+        document.getElementById('allocationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.saveAllocation(index);
+        });
+    },
+    
+    async saveAllocation(index = null) {
+        const category = document.getElementById('allocationCategory').value;
+        const amount = document.getElementById('allocationAmount').value;
+        
+        const allocation = { category, amount };
+        
+        if (index !== null) {
+            this.currentBudget.allocations[index] = allocation;
+        } else {
+            if (!this.currentBudget.allocations) {
+                this.currentBudget.allocations = [];
+            }
+            this.currentBudget.allocations.push(allocation);
+        }
+        
+        try {
+            await DataAPI.updateBudget(this.currentBudget.id, this.currentBudget);
+            const budgetIndex = AppState.data.budget.findIndex(b => b.id === this.currentBudget.id);
+            AppState.data.budget[budgetIndex] = this.currentBudget;
+            
+            this.updateSummary();
+            this.renderAllocations();
+            Modal.hide();
+            Notification.success(index !== null ? 'Allocation updated' : 'Allocation added');
+        } catch (error) {
+            Notification.error('Failed to save allocation');
+        }
+    },
+    
+    editAllocation(index) {
+        this.showEditAllocationModal(index);
+    },
+    
+    async deleteAllocation(index) {
+        if (!confirm('Are you sure you want to delete this allocation?')) {
+            return;
+        }
+        
+        this.currentBudget.allocations.splice(index, 1);
+        
+        try {
+            await DataAPI.updateBudget(this.currentBudget.id, this.currentBudget);
+            const budgetIndex = AppState.data.budget.findIndex(b => b.id === this.currentBudget.id);
+            AppState.data.budget[budgetIndex] = this.currentBudget;
+            
+            this.updateSummary();
+            this.renderAllocations();
+            Notification.success('Allocation deleted');
+        } catch (error) {
+            Notification.error('Failed to delete allocation');
+        }
+    }
+};
+
 
 // ===================================
 // Initialize Application

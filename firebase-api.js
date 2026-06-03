@@ -76,6 +76,55 @@ const FirebaseAPI = {
         }
     },
     
+    
+    // ===================================
+    // Budget API
+    // ===================================
+    async getBudget() {
+        try {
+            const snapshot = await this.getRef('budget').once('value');
+            const data = snapshot.val();
+            const records = data ? Object.keys(data).map(key => ({
+                id: key,
+                ...data[key]
+            })) : [];
+            return { data: records };
+        } catch (error) {
+            console.error('Error getting budget:', error);
+            throw error;
+        }
+    },
+    
+    async addBudget(data) {
+        try {
+            const ref = this.getRef('budget').push();
+            await ref.set(data);
+            return { success: true, data: { id: ref.key, ...data } };
+        } catch (error) {
+            console.error('Error adding budget:', error);
+            throw error;
+        }
+    },
+    
+    async updateBudget(id, data) {
+        try {
+            await this.getRef(`budget/${id}`).update(data);
+            return { success: true };
+        } catch (error) {
+            console.error('Error updating budget:', error);
+            throw error;
+        }
+    },
+    
+    async deleteBudget(id) {
+        try {
+            await this.getRef(`budget/${id}`).remove();
+            return { success: true };
+        } catch (error) {
+            console.error('Error deleting budget:', error);
+            throw error;
+        }
+    },
     async deleteBloodSugar(id) {
         try {
             await this.getRef(`bloodSugar/${id}`).remove();

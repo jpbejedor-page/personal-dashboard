@@ -69,6 +69,10 @@
                     <i class="fas fa-heartbeat"></i>
                     <span>Blood Sugar</span>
                 </li>
+                <li class="nav-item" data-module="budget">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <span>Salary Budget</span>
+                </li>
                 <li class="nav-item" data-module="financial">
                     <i class="fas fa-wallet"></i>
                     <span>Financial</span>
@@ -179,6 +183,69 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Budget Module -->
+            <section id="budget-module" class="module">
+                <div class="module-header">
+                    <h2><i class="fas fa-money-bill-wave"></i> Monthly Salary Budget</h2>
+                    <button class="btn btn-primary" id="addBudgetBtn">
+                        <i class="fas fa-plus"></i> New Budget
+                    </button>
+                </div>
+                <div class="module-content">
+                    <div class="budget-selector">
+                        <label for="budgetMonthSelect">Select Month:</label>
+                        <select id="budgetMonthSelect" class="filter-select">
+                            <option value="">Select a month...</option>
+                        </select>
+                    </div>
+                    <div id="budgetDisplay" class="budget-display" style="display: none;">
+                        <div class="budget-summary-card">
+                            <h3 id="budgetMonthTitle">Budget for Month</h3>
+                            <div class="budget-summary-grid">
+                                <div class="budget-summary-item">
+                                    <label>Monthly Salary:</label>
+                                    <span id="budgetSalary" class="budget-amount">₱0.00</span>
+                                </div>
+                                <div class="budget-summary-item">
+                                    <label>Total Allocated:</label>
+                                    <span id="budgetAllocated" class="budget-amount">₱0.00</span>
+                                </div>
+                                <div class="budget-summary-item">
+                                    <label>Remaining:</label>
+                                    <span id="budgetRemaining" class="budget-amount">₱0.00</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="budget-allocations">
+                            <div class="allocations-header">
+                                <h4>Budget Allocations</h4>
+                                <button class="btn btn-sm btn-primary" id="addAllocationBtn">
+                                    <i class="fas fa-plus"></i> Add Allocation
+                                </button>
+                            </div>
+                            <div class="data-table-container">
+                                <table class="data-table" id="budgetTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            <th>Amount</th>
+                                            <th>Percentage</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="budgetTableBody">
+                                        <tr>
+                                            <td colspan="4" style="text-align: center;">No allocations yet</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
