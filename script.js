@@ -1613,8 +1613,8 @@ const Budget = {
         // Clear existing options
         yearSelect.innerHTML = '<option value="">Select year...</option>';
         
-        // Add years from 5 years ago to 2 years in the future
-        for (let year = currentYear - 5; year <= currentYear + 2; year++) {
+        // Add years from current year to 15 years in the future
+        for (let year = currentYear; year <= currentYear + 15; year++) {
             const option = document.createElement('option');
             option.value = year;
             option.textContent = year;
@@ -1736,7 +1736,7 @@ const Budget = {
                         <label for="budgetYearInput">Year *</label>
                         <select id="budgetYearInput" required>
                             <option value="">Select year...</option>
-                            ${Array.from({length: 8}, (_, i) => currentYear - 5 + i).map(year =>
+                            ${Array.from({length: 16}, (_, i) => currentYear + i).map(year =>
                                 `<option value="${year}" ${year === currentYear ? 'selected' : ''}>${year}</option>`
                             ).join('')}
                         </select>
