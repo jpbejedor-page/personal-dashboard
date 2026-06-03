@@ -694,27 +694,118 @@ const BloodSugar = {
         const data = AppState.data.bloodSugar;
         
         if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No records found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No records found</td></tr>';
             return;
         }
         
-        tbody.innerHTML = data.map(item => `
-            <tr>
-                <td data-label="Date & Time">${Utils.formatDate(item.datetime, CONFIG.app.dateTimeFormat)}</td>
-                <td data-label="Level">${item.level} mg/dL</td>
-                <td data-label="Notes">${item.notes || '-'}</td>
-                <td data-label="Actions">
-                    <div class="action-buttons">
-                        <button class="action-btn" onclick="BloodSugar.edit('${item.id}')">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="action-btn delete" onclick="BloodSugar.delete('${item.id}')">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = data.map(item => {
+            const indicator = this.getHealthIndicator(item.level, item.mealTiming);
+            return `
+                <tr>
+                    <td data-label="Date & Time">${Utils.formatDate(item.datetime, CONFIG.app.dateTimeFormat)}</td>
+                    <td data-label="Meal Timing">${this.formatMealTiming(item.mealTiming)}</td>
+                    <td data-label="Level">${item.level} mg/dL</td>
+                    <td data-label="Status">
+                        <span class="blood-sugar-indicator ${indicator.class}" title="${indicator.description}">
+                            ${indicator.icon} ${indicator.label}
+                        </span>
+                    </td>
+                    <td data-label="Notes">${item.notes || '-'}</td>
+                    <td data-label="Actions">
+                        <div class="action-buttons">
+                            <button class="action-btn" onclick="BloodSugar.edit('${item.id}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="action-btn delete" onclick="BloodSugar.delete('${item.id}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+    
+    formatMealTiming(timing) {
+        if (!timing) return '-';
+        if (timing === 'fasting') return 'Fasting';
+        return `${timing}h after meal`;
+    },
+    
+    getHealthIndicator(level, mealTiming) {
+        const lvl = parseFloat(level);
+        const isFasting = mealTiming === 'fasting';
+        
+        // Very High: > 250
+        if (lvl > 250) {
+            return {
+                icon: '🚨',
+                label: 'Very High',
+                class: 'very-high',
+                description: 'Very high - take action / seek advice'
+            };
+        }
+        
+        // High: > 180
+        if (lvl > 180) {
+            return {
+                icon: '🔴',
+                label: 'High',
+                class: 'high',
+                description: 'High - monitor and correct'
+            };
+        }
+        
+        // Elevated (fasting only): > 100
+        if (isFasting && lvl > 100) {
+            return {
+                icon: '⚠️',
+                label: 'Elevated',
+                class: 'elevated',
+                description: 'Elevated fasting level'
+            };
+        }
+        
+        // Low: < 80
+        if (lvl < 80) {
+            return {
+                icon: '⚠️',
+                label: 'Low',
+                class: 'low',
+                description: 'Low - treat immediately'
+            };
+        }
+        
+        // Target ranges
+        if (isFasting) {
+            // Fasting: 80-99
+            if (lvl >= 80 && lvl <= 99) {
+                return {
+                    icon: '✅',
+                    label: 'Target',
+                    class: 'target',
+                    description: 'Target range (fasting: 80-99)'
+                };
+            }
+        } else {
+            // After meal: < 180
+            if (lvl < 180) {
+                return {
+                    icon: '✅',
+                    label: 'Target',
+                    class: 'target',
+                    description: 'Target range (after meal: < 180)'
+                };
+            }
+        }
+        
+        // Default
+        return {
+            icon: '⚠️',
+            label: 'Monitor',
+            class: 'elevated',
+            description: 'Monitor closely'
+        };
     },
     
     showAddModal() {
@@ -725,12 +816,24 @@ const BloodSugar = {
                     <input type="datetime-local" id="bsDatetime" required value="${Utils.getCurrentDateTime()}">
                 </div>
                 <div class="form-group">
+                    <label for="bsMealTiming">Meal Timing *</label>
+                    <select id="bsMealTiming" required>
+                        <option value="">Select timing</option>
+                        <option value="fasting">Fasting</option>
+                        <option value="1">1 hour after meal</option>
+                        <option value="2">2 hours after meal</option>
+                        <option value="3">3 hours after meal</option>
+                        <option value="4">4 hours after meal</option>
+                        <option value="5">5+ hours after meal</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label for="bsLevel">Blood Sugar Level (mg/dL) *</label>
                     <input type="number" id="bsLevel" required min="0" step="0.1">
                 </div>
                 <div class="form-group">
                     <label for="bsNotes">Notes</label>
-                    <textarea id="bsNotes" rows="3"></textarea>
+                    <textarea id="bsNotes" rows="3" placeholder="Optional notes about the reading..."></textarea>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Cancel</button>
@@ -759,12 +862,24 @@ const BloodSugar = {
                     <input type="datetime-local" id="bsDatetime" required value="${record.datetime}">
                 </div>
                 <div class="form-group">
+                    <label for="bsMealTiming">Meal Timing *</label>
+                    <select id="bsMealTiming" required>
+                        <option value="">Select timing</option>
+                        <option value="fasting" ${record.mealTiming === 'fasting' ? 'selected' : ''}>Fasting</option>
+                        <option value="1" ${record.mealTiming === '1' ? 'selected' : ''}>1 hour after meal</option>
+                        <option value="2" ${record.mealTiming === '2' ? 'selected' : ''}>2 hours after meal</option>
+                        <option value="3" ${record.mealTiming === '3' ? 'selected' : ''}>3 hours after meal</option>
+                        <option value="4" ${record.mealTiming === '4' ? 'selected' : ''}>4 hours after meal</option>
+                        <option value="5" ${record.mealTiming === '5' ? 'selected' : ''}>5+ hours after meal</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label for="bsLevel">Blood Sugar Level (mg/dL) *</label>
                     <input type="number" id="bsLevel" required min="0" step="0.1" value="${record.level}">
                 </div>
                 <div class="form-group">
                     <label for="bsNotes">Notes</label>
-                    <textarea id="bsNotes" rows="3">${record.notes || ''}</textarea>
+                    <textarea id="bsNotes" rows="3" placeholder="Optional notes about the reading...">${record.notes || ''}</textarea>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Cancel</button>
@@ -784,6 +899,7 @@ const BloodSugar = {
     async save(id = null) {
         const data = {
             datetime: document.getElementById('bsDatetime').value,
+            mealTiming: document.getElementById('bsMealTiming').value,
             level: document.getElementById('bsLevel').value,
             notes: document.getElementById('bsNotes').value
         };
