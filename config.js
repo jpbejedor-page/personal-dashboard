@@ -20,13 +20,14 @@ const CONFIG = {
     // Firebase Configuration
     // Get these from Firebase Console: Project Settings > General > Your apps
     firebase: {
-        apiKey: "YOUR_FIREBASE_API_KEY",
-        authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-        databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_PROJECT_ID.appspot.com",
-        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-        appId: "YOUR_APP_ID"
+        apiKey: "AIzaSyAmLnH6zAHsoNuK9MCgMXt-Qlq2AHcfGIE",
+        authDomain: "personal-dashboard-54d9f.firebaseapp.com",
+        databaseURL: "https://personal-dashboard-54d9f-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "personal-dashboard-54d9f",
+        storageBucket: "personal-dashboard-54d9f.firebasestorage.app",
+        messagingSenderId: "863240942329",
+        appId: "1:863240942329:web:2afc7c07fc91c59cb4e828",
+        measurementId: "G-43JN097S6D"
     },
     
     // Database Type: 'firebase' or 'mock'
