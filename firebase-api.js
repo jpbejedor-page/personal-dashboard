@@ -252,6 +252,64 @@ const FirebaseAPI = {
     },
     
     // ===================================
+    // Simple Loans API
+    // ===================================
+    async getSimpleLoans() {
+        try {
+            const snapshot = await this.getRef('simpleLoans').once('value');
+            const data = snapshot.val();
+            const records = data ? Object.keys(data).map(key => ({
+                id: key,
+                ...data[key]
+            })) : [];
+            return { data: records };
+        } catch (error) {
+            console.error('Error getting simple loans:', error);
+            throw error;
+        }
+    },
+    
+    async addSimpleLoan(data) {
+        try {
+            const ref = this.getRef('simpleLoans').push();
+            await ref.set({
+                ...data,
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            });
+            return { 
+                success: true, 
+                data: { id: ref.key, ...data }
+            };
+        } catch (error) {
+            console.error('Error adding simple loan:', error);
+            throw error;
+        }
+    },
+    
+    async updateSimpleLoan(id, data) {
+        try {
+            await this.getRef(`simpleLoans/${id}`).update({
+                ...data,
+                updatedAt: firebase.database.ServerValue.TIMESTAMP
+            });
+            return { success: true };
+        } catch (error) {
+            console.error('Error updating simple loan:', error);
+            throw error;
+        }
+    },
+    
+    async deleteSimpleLoan(id) {
+        try {
+            await this.getRef(`simpleLoans/${id}`).remove();
+            return { success: true };
+        } catch (error) {
+            console.error('Error deleting simple loan:', error);
+            throw error;
+        }
+    },
+    
+    // ===================================
     // Real-time Listeners
     // ===================================
     onBloodSugarChange(callback) {

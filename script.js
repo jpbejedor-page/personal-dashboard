@@ -13,6 +13,7 @@ const AppState = {
         budget: [],
         financial: [],
         lending: [],
+        simpleLoans: [],
         users: []
     },
     charts: {},
@@ -714,7 +715,8 @@ const Dashboard = {
                 DataAPI.getBloodSugar(),
                 DataAPI.getBudget(),
                 DataAPI.getFinancial(),
-                DataAPI.getLending()
+                DataAPI.getLending(),
+                DataAPI.getSimpleLoans()
             ];
             
             // Load users if admin
@@ -728,9 +730,10 @@ const Dashboard = {
             AppState.data.budget = results[1].data || [];
             AppState.data.financial = results[2].data || [];
             AppState.data.lending = results[3].data || [];
+            AppState.data.simpleLoans = results[4].data || [];
             
-            if (AppState.isAdmin() && results[4]) {
-                AppState.data.users = results[4].data || [];
+            if (AppState.isAdmin() && results[5]) {
+                AppState.data.users = results[5].data || [];
             }
             
             // Initialize modules based on permissions
@@ -748,6 +751,7 @@ const Dashboard = {
             }
             if (AppState.hasPermission('lending', 'view')) {
                 Lending.init();
+                SimpleLoanTracker.init();
             }
             if (AppState.isAdmin()) {
                 UserManagement.init();
@@ -825,12 +829,19 @@ const Overview = {
         document.getElementById('totalIncome').textContent = Utils.formatCurrency(income);
         document.getElementById('totalExpenses').textContent = Utils.formatCurrency(expenses);
         
-        // Active loans
-        const activeLoans = AppState.data.lending.filter(item => 
+        // Active loans (including simple loans)
+        const activeLoans = AppState.data.lending.filter(item =>
             item.status === 'Active' || item.status === 'Overdue'
         ).length;
         
-        document.getElementById('activeLoans').textContent = activeLoans;
+        const activeSimpleLoans = AppState.data.simpleLoans.filter(item => {
+            const details = SimpleLoanTracker.calculateLoanDetails(item);
+            return details.balance > 0;
+        }).length;
+        
+        const totalActiveLoans = activeLoans + activeSimpleLoans;
+        
+        document.getElementById('activeLoans').textContent = totalActiveLoans;
     },
     
     initCharts() {
@@ -2012,6 +2023,522 @@ const Lending = {
         }
     }
 };
+// ===================================
+// Simple Loan Tracker Module
+// ===================================
+const SimpleLoanTracker = {
+    init() {
+        this.renderTable();
+        this.setupEventListeners();
+    },
+    
+    setupEventListeners() {
+        document.getElementById('addSimpleLoanBtn').addEventListener('click', () => {
+            this.showAddModal();
+        });
+        
+        document.getElementById('exportSimpleLoansBtn').addEventListener('click', () => {
+            this.exportData();
+        });
+    },
+    
+    exportData() {
+        const data = AppState.data.simpleLoans;
+        
+        if (data.length === 0) {
+            Notification.warning('No data to export');
+            return;
+        }
+        
+        const exportData = data.map(item => {
+            const details = this.calculateLoanDetails(item);
+            return {
+                'Borrower': item.borrower,
+                'Date': Utils.formatDate(item.date),
+                'Principal': parseFloat(details.principal),
+                'Total Payments': parseFloat(details.totalPayments),
+                'Total Charges': parseFloat(details.totalCharges),
+                'Balance': parseFloat(details.balance),
+                'Status': details.isPaid ? 'Paid' : 'Active'
+            };
+        });
+        
+        const success = Utils.exportToXLSX(exportData, 'simple_loans', 'Simple Loan Records');
+        
+        if (success) {
+            Notification.success('Simple loan data exported successfully!');
+        } else {
+            Notification.error('Failed to export simple loan data');
+        }
+    },
+    
+    calculateLoanDetails(loan) {
+        const principal = parseFloat(loan.principal || 0);
+        const payments = loan.payments || [];
+        const charges = loan.charges || [];
+        
+        const totalPayments = payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+        const totalCharges = charges.reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
+        const balance = principal + totalCharges - totalPayments;
+        
+        return {
+            principal,
+            totalPayments,
+            totalCharges,
+            balance,
+            isPaid: balance <= 0
+        };
+    },
+    
+    renderTable() {
+        const tbody = document.getElementById('simpleLoansTableBody');
+        const data = AppState.data.simpleLoans;
+        
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">No records found</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = data.map(item => {
+            const details = this.calculateLoanDetails(item);
+            const statusClass = details.isPaid ? 'paid' : 'active';
+            const status = details.isPaid ? 'Paid' : 'Active';
+            
+            return `
+                <tr>
+                    <td data-label="Borrower">
+                        <strong>${item.borrower}</strong>
+                        ${item.notes ? `<br><small>${item.notes}</small>` : ''}
+                    </td>
+                    <td data-label="Date">${Utils.formatDate(item.date)}</td>
+                    <td data-label="Principal">${Utils.formatCurrency(details.principal)}</td>
+                    <td data-label="Payments">${Utils.formatCurrency(details.totalPayments)}</td>
+                    <td data-label="Charges">${Utils.formatCurrency(details.totalCharges)}</td>
+                    <td data-label="Balance">
+                        <strong style="color: ${details.balance > 0 ? 'var(--danger-color)' : 'var(--success-color)'}">
+                            ${Utils.formatCurrency(details.balance)}
+                        </strong>
+                    </td>
+                    <td data-label="Status">
+                        <span class="status-badge status-${statusClass}">${status}</span>
+                    </td>
+                    <td data-label="Actions">
+                        <div class="action-buttons">
+                            <button class="action-btn" onclick="SimpleLoanTracker.viewTransactions('${item.id}')" title="View Transactions">
+                                <i class="fas fa-list"></i>
+                            </button>
+                            <button class="action-btn" onclick="SimpleLoanTracker.addPayment('${item.id}')" title="Add Payment">
+                                <i class="fas fa-money-bill-wave"></i>
+                            </button>
+                            <button class="action-btn" onclick="SimpleLoanTracker.addCharge('${item.id}')" title="Add Charge">
+                                <i class="fas fa-plus-circle"></i>
+                            </button>
+                            <button class="action-btn" onclick="SimpleLoanTracker.edit('${item.id}')" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="action-btn action-btn-danger" onclick="SimpleLoanTracker.delete('${item.id}')" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+    
+    showAddModal() {
+        const content = `
+            <form id="simpleLoanForm" class="modal-form">
+                <div class="form-group">
+                    <label for="simpleLoanBorrower">Borrower Name *</label>
+                    <input type="text" id="simpleLoanBorrower" required>
+                </div>
+                <div class="form-group">
+                    <label for="simpleLoanPrincipal">Principal Amount *</label>
+                    <input type="number" id="simpleLoanPrincipal" required min="0" step="0.01" placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label for="simpleLoanDate">Date *</label>
+                    <input type="date" id="simpleLoanDate" required value="${new Date().toISOString().split('T')[0]}">
+                </div>
+                <div class="form-group">
+                    <label for="simpleLoanNotes">Notes</label>
+                    <textarea id="simpleLoanNotes" rows="2" placeholder="Optional notes..."></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Simple Loan</button>
+                </div>
+            </form>
+        `;
+        
+        Modal.show('Add Simple Loan', content);
+        
+        document.getElementById('simpleLoanForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.save();
+        });
+    },
+    
+    showEditModal(id) {
+        const record = AppState.data.simpleLoans.find(item => item.id === id);
+        if (!record) return;
+        
+        const content = `
+            <form id="simpleLoanForm" class="modal-form">
+                <input type="hidden" id="simpleLoanId" value="${id}">
+                <div class="form-group">
+                    <label for="simpleLoanBorrower">Borrower Name *</label>
+                    <input type="text" id="simpleLoanBorrower" required value="${record.borrower}">
+                </div>
+                <div class="form-group">
+                    <label for="simpleLoanPrincipal">Principal Amount *</label>
+                    <input type="number" id="simpleLoanPrincipal" required min="0" step="0.01" value="${record.principal}">
+                </div>
+                <div class="form-group">
+                    <label for="simpleLoanDate">Date *</label>
+                    <input type="date" id="simpleLoanDate" required value="${record.date}">
+                </div>
+                <div class="form-group">
+                    <label for="simpleLoanNotes">Notes</label>
+                    <textarea id="simpleLoanNotes" rows="2">${record.notes || ''}</textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update</button>
+                </div>
+            </form>
+        `;
+        
+        Modal.show('Edit Simple Loan', content);
+        
+        document.getElementById('simpleLoanForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.save(id);
+        });
+    },
+    
+    async save(id = null) {
+        const data = {
+            borrower: document.getElementById('simpleLoanBorrower').value,
+            principal: parseFloat(document.getElementById('simpleLoanPrincipal').value),
+            date: document.getElementById('simpleLoanDate').value,
+            notes: document.getElementById('simpleLoanNotes').value,
+            payments: id ? AppState.data.simpleLoans.find(item => item.id === id)?.payments || [] : [],
+            charges: id ? AppState.data.simpleLoans.find(item => item.id === id)?.charges || [] : []
+        };
+        
+        try {
+            if (id) {
+                await DataAPI.updateSimpleLoan(id, data);
+                const index = AppState.data.simpleLoans.findIndex(item => item.id === id);
+                AppState.data.simpleLoans[index] = { ...AppState.data.simpleLoans[index], ...data };
+                Notification.success('Simple loan updated successfully');
+            } else {
+                const result = await DataAPI.addSimpleLoan(data);
+                AppState.data.simpleLoans.push(result.data || { id: Utils.generateId(), ...data });
+                Notification.success('Simple loan added successfully');
+            }
+            
+            this.renderTable();
+            Overview.updateStats();
+            Modal.hide();
+        } catch (error) {
+            Notification.error('Failed to save simple loan');
+        }
+    },
+    
+    addPayment(id) {
+        const loan = AppState.data.simpleLoans.find(item => item.id === id);
+        if (!loan) return;
+        
+        const details = this.calculateLoanDetails(loan);
+        
+        const content = `
+            <form id="paymentForm" class="modal-form">
+                <div class="form-group">
+                    <label>Borrower: <strong>${loan.borrower}</strong></label>
+                    <label>Current Balance: <strong style="color: var(--danger-color)">${Utils.formatCurrency(details.balance)}</strong></label>
+                </div>
+                <div class="form-group">
+                    <label for="paymentAmount">Payment Amount *</label>
+                    <input type="number" id="paymentAmount" required min="0.01" step="0.01" placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label for="paymentDate">Payment Date *</label>
+                    <input type="date" id="paymentDate" required value="${new Date().toISOString().split('T')[0]}">
+                </div>
+                <div class="form-group">
+                    <label for="paymentNotes">Notes</label>
+                    <textarea id="paymentNotes" rows="2" placeholder="Optional notes..."></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Payment</button>
+                </div>
+            </form>
+        `;
+        
+        Modal.show('Add Payment', content);
+        
+        document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.savePayment(id);
+        });
+    },
+    
+    async savePayment(id) {
+        const loan = AppState.data.simpleLoans.find(item => item.id === id);
+        if (!loan) return;
+        
+        const payment = {
+            amount: parseFloat(document.getElementById('paymentAmount').value),
+            date: document.getElementById('paymentDate').value,
+            notes: document.getElementById('paymentNotes').value,
+            timestamp: new Date().toISOString()
+        };
+        
+        if (!loan.payments) loan.payments = [];
+        loan.payments.push(payment);
+        
+        try {
+            await DataAPI.updateSimpleLoan(id, loan);
+            const index = AppState.data.simpleLoans.findIndex(item => item.id === id);
+            AppState.data.simpleLoans[index] = loan;
+            
+            Notification.success('Payment added successfully');
+            this.renderTable();
+            Overview.updateStats();
+            Modal.hide();
+        } catch (error) {
+            Notification.error('Failed to add payment');
+        }
+    },
+    
+    addCharge(id) {
+        const loan = AppState.data.simpleLoans.find(item => item.id === id);
+        if (!loan) return;
+        
+        const details = this.calculateLoanDetails(loan);
+        
+        const content = `
+            <form id="chargeForm" class="modal-form">
+                <div class="form-group">
+                    <label>Borrower: <strong>${loan.borrower}</strong></label>
+                    <label>Current Balance: <strong style="color: var(--danger-color)">${Utils.formatCurrency(details.balance)}</strong></label>
+                </div>
+                <div class="form-group">
+                    <label for="chargeAmount">Charge Amount *</label>
+                    <input type="number" id="chargeAmount" required min="0.01" step="0.01" placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label for="chargeDate">Charge Date *</label>
+                    <input type="date" id="chargeDate" required value="${new Date().toISOString().split('T')[0]}">
+                </div>
+                <div class="form-group">
+                    <label for="chargeDescription">Description *</label>
+                    <input type="text" id="chargeDescription" required placeholder="e.g., Late fee, Interest, etc.">
+                </div>
+                <div class="form-group">
+                    <label for="chargeNotes">Notes</label>
+                    <textarea id="chargeNotes" rows="2" placeholder="Optional notes..."></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Charge</button>
+                </div>
+            </form>
+        `;
+        
+        Modal.show('Add Financial Charge', content);
+        
+        document.getElementById('chargeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.saveCharge(id);
+        });
+    },
+    
+    async saveCharge(id) {
+        const loan = AppState.data.simpleLoans.find(item => item.id === id);
+        if (!loan) return;
+        
+        const charge = {
+            amount: parseFloat(document.getElementById('chargeAmount').value),
+            date: document.getElementById('chargeDate').value,
+            description: document.getElementById('chargeDescription').value,
+            notes: document.getElementById('chargeNotes').value,
+            timestamp: new Date().toISOString()
+        };
+        
+        if (!loan.charges) loan.charges = [];
+        loan.charges.push(charge);
+        
+        try {
+            await DataAPI.updateSimpleLoan(id, loan);
+            const index = AppState.data.simpleLoans.findIndex(item => item.id === id);
+            AppState.data.simpleLoans[index] = loan;
+            
+            Notification.success('Charge added successfully');
+            this.renderTable();
+            Overview.updateStats();
+            Modal.hide();
+        } catch (error) {
+            Notification.error('Failed to add charge');
+        }
+    },
+    
+    viewTransactions(id) {
+        const loan = AppState.data.simpleLoans.find(item => item.id === id);
+        if (!loan) return;
+        
+        const details = this.calculateLoanDetails(loan);
+        const payments = loan.payments || [];
+        const charges = loan.charges || [];
+        
+        const content = `
+            <div class="payment-details">
+                <div class="loan-summary">
+                    <h4>${loan.borrower}</h4>
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <label>Principal:</label>
+                            <span>${Utils.formatCurrency(details.principal)}</span>
+                        </div>
+                        <div class="summary-item">
+                            <label>Total Charges:</label>
+                            <span>${Utils.formatCurrency(details.totalCharges)}</span>
+                        </div>
+                        <div class="summary-item">
+                            <label>Total Payments:</label>
+                            <span>${Utils.formatCurrency(details.totalPayments)}</span>
+                        </div>
+                        <div class="summary-item">
+                            <label>Balance:</label>
+                            <span><strong style="color: ${details.balance > 0 ? 'var(--danger-color)' : 'var(--success-color)'}">
+                                ${Utils.formatCurrency(details.balance)}
+                            </strong></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="payment-schedule">
+                    <h4>Transaction History</h4>
+                    <table class="schedule-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                                <th>Amount</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>${Utils.formatDate(loan.date)}</td>
+                                <td><span class="status-badge status-active">Principal</span></td>
+                                <td>Initial loan amount</td>
+                                <td style="color: var(--danger-color)">${Utils.formatCurrency(details.principal)}</td>
+                                <td>-</td>
+                            </tr>
+                            ${charges.map((charge, index) => `
+                                <tr>
+                                    <td>${Utils.formatDate(charge.date)}</td>
+                                    <td><span class="status-badge status-pending">Charge</span></td>
+                                    <td>${charge.description}${charge.notes ? `<br><small>${charge.notes}</small>` : ''}</td>
+                                    <td style="color: var(--danger-color)">+${Utils.formatCurrency(charge.amount)}</td>
+                                    <td>
+                                        <button class="action-btn action-btn-danger" onclick="SimpleLoanTracker.deleteCharge('${id}', ${index})" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                            ${payments.map((payment, index) => `
+                                <tr>
+                                    <td>${Utils.formatDate(payment.date)}</td>
+                                    <td><span class="status-badge status-paid">Payment</span></td>
+                                    <td>${payment.notes || 'Payment received'}</td>
+                                    <td style="color: var(--success-color)">-${Utils.formatCurrency(payment.amount)}</td>
+                                    <td>
+                                        <button class="action-btn action-btn-danger" onclick="SimpleLoanTracker.deletePayment('${id}', ${index})" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+        
+        Modal.show(`Transaction History - ${loan.borrower}`, content, 'large');
+    },
+    
+    async deletePayment(loanId, paymentIndex) {
+        if (!confirm('Are you sure you want to delete this payment?')) return;
+        
+        const loan = AppState.data.simpleLoans.find(item => item.id === loanId);
+        if (!loan || !loan.payments || !loan.payments[paymentIndex]) return;
+        
+        loan.payments.splice(paymentIndex, 1);
+        
+        try {
+            await DataAPI.updateSimpleLoan(loanId, loan);
+            const index = AppState.data.simpleLoans.findIndex(item => item.id === loanId);
+            AppState.data.simpleLoans[index] = loan;
+            
+            Notification.success('Payment deleted successfully');
+            this.viewTransactions(loanId);
+            this.renderTable();
+        } catch (error) {
+            Notification.error('Failed to delete payment');
+        }
+    },
+    
+    async deleteCharge(loanId, chargeIndex) {
+        if (!confirm('Are you sure you want to delete this charge?')) return;
+        
+        const loan = AppState.data.simpleLoans.find(item => item.id === loanId);
+        if (!loan || !loan.charges || !loan.charges[chargeIndex]) return;
+        
+        loan.charges.splice(chargeIndex, 1);
+        
+        try {
+            await DataAPI.updateSimpleLoan(loanId, loan);
+            const index = AppState.data.simpleLoans.findIndex(item => item.id === loanId);
+            AppState.data.simpleLoans[index] = loan;
+            
+            Notification.success('Charge deleted successfully');
+            this.viewTransactions(loanId);
+            this.renderTable();
+        } catch (error) {
+            Notification.error('Failed to delete charge');
+        }
+    },
+    
+    edit(id) {
+        this.showEditModal(id);
+    },
+    
+    async delete(id) {
+        if (!confirm('Are you sure you want to delete this simple loan?')) {
+            return;
+        }
+        
+        try {
+            await DataAPI.deleteSimpleLoan(id);
+            AppState.data.simpleLoans = AppState.data.simpleLoans.filter(item => item.id !== id);
+            this.renderTable();
+            Overview.updateStats();
+            Notification.success('Simple loan deleted successfully');
+        } catch (error) {
+            Notification.error('Failed to delete simple loan');
+        }
+    }
+};
+
 
 // ===================================
 // Modal Close Handler

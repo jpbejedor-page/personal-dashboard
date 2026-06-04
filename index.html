@@ -404,6 +404,46 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+
+                    <!-- Simple Loan Tracker Section -->
+                    <div class="module-header" style="margin-top: 2rem; border-top: 2px solid var(--border-color); padding-top: 2rem;">
+                        <h3><i class="fas fa-money-check-alt"></i> Simple Loan Tracker</h3>
+                        <div class="module-header-actions">
+                            <button class="btn btn-secondary" id="exportSimpleLoansBtn">
+                                <i class="fas fa-file-excel"></i> Export
+                            </button>
+                            <button class="btn btn-primary" id="addSimpleLoanBtn">
+                                <i class="fas fa-plus"></i> Add Simple Loan
+                            </button>
+                        </div>
+                    </div>
+                    <div class="data-table-container">
+                        <table class="data-table" id="simpleLoansTable">
+                            <thead>
+                                <tr>
+                                    <th>Borrower</th>
+                                    <th>Date</th>
+                                    <th>Principal</th>
+                                    <th>Payments</th>
+                                    <th>Charges</th>
+                                    <th>Balance</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="simpleLoansTableBody">
+                                <tr class="loading-row">
+                                    <td colspan="8">
+                                        <div class="loading-spinner"></div>
+                                        Loading data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
 
             <!-- User Management Module (Admin Only) -->
             <section id="users-module" class="module" style="display: none;">
