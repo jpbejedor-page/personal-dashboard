@@ -2615,49 +2615,93 @@ const Documents = {
     },
     
     parseMarkdown(markdown) {
-        // Simple markdown parser
-        let html = markdown;
+        // Improved markdown parser
+        let lines = markdown.split('\n');
+        let html = '';
+        let inList = false;
+        let listType = '';
         
-        // Headers
-        html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
-        html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
-        html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-        
-        // Bold
-        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        
-        // Italic
-        html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-        
-        // Links
-        html = html.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
-        
-        // Code
-        html = html.replace(/`(.*?)`/g, '<code>$1</code>');
-        
-        // Horizontal rule
-        html = html.replace(/^---$/gim, '<hr>');
-        
-        // Lists - Unordered
-        html = html.replace(/^\- (.*$)/gim, '<li>$1</li>');
-        html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
-        
-        // Lists - Ordered
-        html = html.replace(/^\d+\. (.*$)/gim, '<li>$1</li>');
-        
-        // Checkboxes
-        html = html.replace(/\[ \]/g, '<input type="checkbox" disabled>');
-        html = html.replace(/\[x\]/gi, '<input type="checkbox" checked disabled>');
-        
-        // Paragraphs
-        html = html.split('\n\n').map(para => {
-            if (!para.match(/^<[h|u|o|l|d]/)) {
-                return `<p>${para.replace(/\n/g, '<br>')}</p>`;
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            
+            // Skip empty lines
+            if (line.trim() === '') {
+                if (inList) {
+                    html += listType === 'ul' ? '</ul>' : '</ol>';
+                    inList = false;
+                }
+                html += '<br>';
+                continue;
             }
-            return para;
-        }).join('\n');
+            
+            // Headers
+            if (line.startsWith('### ')) {
+                if (inList) { html += listType === 'ul' ? '</ul>' : '</ol>'; inList = false; }
+                html += `<h3>${this.parseInline(line.substring(4))}</h3>`;
+            } else if (line.startsWith('## ')) {
+                if (inList) { html += listType === 'ul' ? '</ul>' : '</ol>'; inList = false; }
+                html += `<h2>${this.parseInline(line.substring(3))}</h2>`;
+            } else if (line.startsWith('# ')) {
+                if (inList) { html += listType === 'ul' ? '</ul>' : '</ol>'; inList = false; }
+                html += `<h1>${this.parseInline(line.substring(2))}</h1>`;
+            }
+            // Horizontal rule
+            else if (line.trim() === '---') {
+                if (inList) { html += listType === 'ul' ? '</ul>' : '</ol>'; inList = false; }
+                html += '<hr>';
+            }
+            // Unordered list
+            else if (line.match(/^[\-\*] /)) {
+                if (!inList || listType !== 'ul') {
+                    if (inList) html += listType === 'ul' ? '</ul>' : '</ol>';
+                    html += '<ul>';
+                    inList = true;
+                    listType = 'ul';
+                }
+                html += `<li>${this.parseInline(line.substring(2))}</li>`;
+            }
+            // Ordered list
+            else if (line.match(/^\d+\. /)) {
+                if (!inList || listType !== 'ol') {
+                    if (inList) html += listType === 'ul' ? '</ul>' : '</ol>';
+                    html += '<ol>';
+                    inList = true;
+                    listType = 'ol';
+                }
+                html += `<li>${this.parseInline(line.substring(line.indexOf('. ') + 2))}</li>`;
+            }
+            // Regular paragraph
+            else {
+                if (inList) {
+                    html += listType === 'ul' ? '</ul>' : '</ol>';
+                    inList = false;
+                }
+                html += `<p>${this.parseInline(line)}</p>`;
+            }
+        }
+        
+        // Close any open lists
+        if (inList) {
+            html += listType === 'ul' ? '</ul>' : '</ol>';
+        }
         
         return html;
+    },
+    
+    parseInline(text) {
+        // Bold
+        text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        // Italic
+        text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        // Links
+        text = text.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
+        // Code
+        text = text.replace(/`(.*?)`/g, '<code>$1</code>');
+        // Checkboxes
+        text = text.replace(/\[ \]/g, '<input type="checkbox" disabled>');
+        text = text.replace(/\[x\]/gi, '<input type="checkbox" checked disabled>');
+        
+        return text;
     }
 };
 
