@@ -1842,3 +1842,259 @@ body.dark-mode .budget-summary-item {
         padding: var(--spacing-md);
     }
 }
+
+/* ===================================
+   Security & Authentication Styles
+   =================================== */
+
+/* Password Strength Indicator */
+.password-strength {
+    margin-top: 0.5rem;
+}
+
+.strength-bar {
+    height: 6px;
+    background-color: #e5e7eb;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+}
+
+.strength-fill {
+    height: 100%;
+    transition: width 0.3s ease, background-color 0.3s ease;
+    border-radius: 3px;
+}
+
+.strength-text {
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.password-errors {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.password-errors ul {
+    margin: 0.25rem 0;
+    padding-left: 1.5rem;
+}
+
+.password-errors li {
+    margin: 0.25rem 0;
+}
+
+.form-help {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+/* 2FA Styles */
+#twoFactorCode {
+    font-family: 'Courier New', monospace;
+}
+
+/* Security Badge Styles */
+.security-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.security-badge.secure {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.security-badge.warning {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.security-badge.danger {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+/* Login Error Styles */
+.error-message {
+    padding: 0.75rem;
+    margin-top: 1rem;
+    background-color: #fee2e2;
+    border: 1px solid #fecaca;
+    border-radius: 0.375rem;
+    color: #991b1b;
+    font-size: 0.875rem;
+}
+
+/* Session Timeout Warning */
+.session-warning {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    padding: 1rem;
+    background-color: #fef3c7;
+    border: 1px solid #fcd34d;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    z-index: 9999;
+    max-width: 400px;
+}
+
+.session-warning .warning-content {
+    display: flex;
+    align-items: start;
+    gap: 0.75rem;
+}
+
+.session-warning .warning-icon {
+    color: #f59e0b;
+    font-size: 1.5rem;
+}
+
+.session-warning .warning-text {
+    flex: 1;
+}
+
+.session-warning .warning-actions {
+    margin-top: 0.75rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Permissions Grid Enhancement */
+.permissions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.permission-item {
+    padding: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background-color: #f9fafb;
+}
+
+.permission-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.permission-header i {
+    color: #6b7280;
+}
+
+.permission-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.permission-options label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.permission-options input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    cursor: pointer;
+}
+
+/* Security Logs Table */
+.security-logs-table {
+    width: 100%;
+    font-size: 0.875rem;
+}
+
+.security-logs-table th {
+    background-color: #f3f4f6;
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+}
+
+.security-logs-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.log-type {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.log-type.login {
+    background-color: #dbeafe;
+    color: #1e40af;
+}
+
+.log-type.logout {
+    background-color: #e0e7ff;
+    color: #4338ca;
+}
+
+.log-type.user_management {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.log-success {
+    color: #059669;
+}
+
+.log-failure {
+    color: #dc2626;
+}
+
+/* Dark Mode Adjustments for Security Features */
+body.dark-mode .password-strength .strength-bar {
+    background-color: #374151;
+}
+
+body.dark-mode .permission-item {
+    background-color: #1f2937;
+    border-color: #374151;
+}
+
+body.dark-mode .permission-header {
+    color: #e5e7eb;
+}
+
+body.dark-mode .error-message {
+    background-color: #7f1d1d;
+    border-color: #991b1b;
+    color: #fecaca;
+}
+
+body.dark-mode .session-warning {
+    background-color: #78350f;
+    border-color: #92400e;
+}
+
+body.dark-mode .security-logs-table th {
+    background-color: #1f2937;
+}
+
+body.dark-mode .security-logs-table td {
+    border-bottom-color: #374151;
+}

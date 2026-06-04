@@ -454,11 +454,21 @@ if (typeof CONFIG !== 'undefined' && CONFIG.databaseType === 'firebase' && typeo
 // ===================================
 const Auth = {
     init() {
-        // Check if user is already logged in
-        const user = localStorage.getItem('currentUser');
-        if (user) {
-            AppState.currentUser = JSON.parse(user);
+        // Check if user has active session
+        const session = AuthSecurity.getSession();
+        if (session) {
+            // Restore user from session
+            AppState.currentUser = {
+                id: session.userId,
+                username: session.username,
+                role: session.role,
+                permissions: session.permissions,
+                sessionToken: session.token
+            };
             this.showDashboard();
+        } else {
+            // Clear any old localStorage data
+            localStorage.removeItem('currentUser');
         }
         
         // Login form handler
@@ -478,9 +488,37 @@ const Auth = {
     },
     
     async login() {
-        const username = document.getElementById('username').value;
+        const username = AuthSecurity.sanitizeInput(document.getElementById('username').value);
         const password = document.getElementById('password').value;
         const errorDiv = document.getElementById('loginError');
+        
+        // Validate username format
+        if (!AuthSecurity.validateUsername(username)) {
+            errorDiv.textContent = 'Invalid username format';
+            errorDiv.style.display = 'block';
+            return;
+        }
+        
+        // Check login attempts
+        const attemptCheck = AuthSecurity.checkLoginAttempts(username);
+        if (!attemptCheck.allowed) {
+            if (attemptCheck.locked) {
+                errorDiv.textContent = `Account locked. Try again in ${attemptCheck.remainingTime} minutes.`;
+            } else {
+                errorDiv.textContent = `Too many failed attempts. ${attemptCheck.remaining} attempts remaining.`;
+            }
+            errorDiv.style.display = 'block';
+            
+            // Log failed attempt
+            await AuthSecurity.logSecurityEvent({
+                type: 'login',
+                username: username,
+                action: 'login_blocked',
+                success: false,
+                details: { reason: 'rate_limit' }
+            });
+            return;
+        }
         
         try {
             // Try to authenticate with Firebase users
@@ -489,14 +527,58 @@ const Auth = {
             if (response.success && response.data) {
                 const user = response.data;
                 
-                // Check password (in production, use proper hashing!)
-                if (user.password === password) {
-                    // Check if user is active
-                    if (user.status !== 'active') {
-                        errorDiv.textContent = 'Your account is inactive. Please contact an administrator.';
-                        errorDiv.style.display = 'block';
+                // Check if user is active
+                if (user.status !== 'active') {
+                    errorDiv.textContent = 'Your account is inactive. Please contact an administrator.';
+                    errorDiv.style.display = 'block';
+                    
+                    AuthSecurity.recordLoginAttempt(username, false);
+                    await AuthSecurity.logSecurityEvent({
+                        type: 'login',
+                        username: username,
+                        action: 'login_failed',
+                        success: false,
+                        details: { reason: 'inactive_account' }
+                    });
+                    return;
+                }
+                
+                // Verify password with hash
+                let passwordValid = false;
+                if (user.passwordHash && user.passwordSalt) {
+                    // New secure password system
+                    passwordValid = await AuthSecurity.verifyPassword(password, user.passwordHash, user.passwordSalt);
+                } else if (user.password) {
+                    // Legacy plain text password (for migration)
+                    passwordValid = (user.password === password);
+                    
+                    // Migrate to hashed password
+                    if (passwordValid) {
+                        const { hash, salt } = await AuthSecurity.hashPassword(password);
+                        await FirebaseAPI.updateUser(user.id, {
+                            passwordHash: hash,
+                            passwordSalt: salt,
+                            password: null // Remove plain text password
+                        });
+                    }
+                }
+                
+                if (passwordValid) {
+                    // Check 2FA if enabled
+                    if (user.twoFactorEnabled) {
+                        // Store temporary login state for 2FA verification
+                        sessionStorage.setItem('pending2FA', JSON.stringify({
+                            userId: user.id,
+                            username: user.username,
+                            timestamp: Date.now()
+                        }));
+                        
+                        this.show2FAPrompt();
                         return;
                     }
+                    
+                    // Create secure session
+                    const session = AuthSecurity.createSession(user);
                     
                     // Set current user
                     AppState.currentUser = {
@@ -504,10 +586,19 @@ const Auth = {
                         username: user.username,
                         role: user.role,
                         permissions: user.permissions,
-                        loginTime: Date.now()
+                        sessionToken: session.token
                     };
                     
-                    localStorage.setItem('currentUser', JSON.stringify(AppState.currentUser));
+                    // Record successful login
+                    AuthSecurity.recordLoginAttempt(username, true);
+                    
+                    // Log successful login
+                    await AuthSecurity.logSecurityEvent({
+                        type: 'login',
+                        username: username,
+                        action: 'login_success',
+                        success: true
+                    });
                     
                     this.showDashboard();
                     Notification.success(`Welcome back, ${user.username}!`);
@@ -515,27 +606,33 @@ const Auth = {
                 }
             }
             
-            // Fallback to config-based auth (for initial admin)
-            if (username === CONFIG.auth.username && password === CONFIG.auth.password) {
-                const user = {
-                    username,
-                    role: 'admin',
-                    permissions: null,
-                    loginTime: Date.now()
-                };
-                AppState.currentUser = user;
-                localStorage.setItem('currentUser', JSON.stringify(user));
-                
-                this.showDashboard();
-                Notification.success('Login successful!');
-            } else {
-                errorDiv.textContent = 'Invalid username or password';
-                errorDiv.style.display = 'block';
-            }
+            // No user found or invalid password
+            // Record failed attempt
+            AuthSecurity.recordLoginAttempt(username, false);
+            
+            await AuthSecurity.logSecurityEvent({
+                type: 'login',
+                username: username,
+                action: 'login_failed',
+                success: false,
+                details: { reason: 'invalid_credentials' }
+            });
+            
+            const remainingAttempts = AuthSecurity.checkLoginAttempts(username).remaining;
+            errorDiv.textContent = `Invalid username or password. ${remainingAttempts} attempts remaining.`;
+            errorDiv.style.display = 'block';
         } catch (error) {
             console.error('Login error:', error);
             errorDiv.textContent = 'Login failed. Please try again.';
             errorDiv.style.display = 'block';
+            
+            await AuthSecurity.logSecurityEvent({
+                type: 'login',
+                username: username,
+                action: 'login_error',
+                success: false,
+                details: { error: error.message }
+            });
         }
     },
     
@@ -549,14 +646,139 @@ const Auth = {
         Notification.info('Google login feature coming soon!');
     },
     
-    logout() {
+    async logout(sessionExpired = false) {
+        const username = AppState.currentUser?.username;
+        
+        // Log logout event
+        if (username) {
+            await AuthSecurity.logSecurityEvent({
+                type: 'logout',
+                username: username,
+                action: sessionExpired ? 'session_expired' : 'user_logout',
+                success: true
+            });
+        }
+        
+        // Destroy session
+        AuthSecurity.destroySession();
+        
+        // Clear app state
         AppState.currentUser = null;
-        localStorage.removeItem('currentUser');
         
         document.getElementById('dashboard').style.display = 'none';
         document.getElementById('loginScreen').style.display = 'flex';
         
-        Notification.info('Logged out successfully');
+        // Clear login form
+        document.getElementById('loginForm').reset();
+        document.getElementById('loginError').style.display = 'none';
+        
+        if (sessionExpired) {
+            Notification.warning('Your session has expired. Please login again.');
+        } else {
+            Notification.info('Logged out successfully');
+        }
+    },
+    
+    show2FAPrompt() {
+        const modalBody = `
+            <form id="verify2FAForm">
+                <div class="form-group">
+                    <label for="twoFactorCode">Enter 6-digit code from your authenticator app:</label>
+                    <input type="text" id="twoFactorCode" name="twoFactorCode"
+                           maxlength="6" pattern="[0-9]{6}" required
+                           placeholder="000000" style="text-align: center; font-size: 1.5rem; letter-spacing: 0.5rem;">
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-check"></i> Verify
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="Modal.close()">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                </div>
+            </form>
+        `;
+        
+        Modal.show('Two-Factor Authentication', modalBody);
+        
+        document.getElementById('verify2FAForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.verify2FA();
+        });
+    },
+    
+    async verify2FA() {
+        const code = document.getElementById('twoFactorCode').value;
+        const pendingData = sessionStorage.getItem('pending2FA');
+        
+        if (!pendingData) {
+            Notification.error('2FA session expired. Please login again.');
+            Modal.close();
+            return;
+        }
+        
+        const pending = JSON.parse(pendingData);
+        
+        // Check if 2FA session expired (5 minutes)
+        if (Date.now() - pending.timestamp > 5 * 60 * 1000) {
+            sessionStorage.removeItem('pending2FA');
+            Notification.error('2FA session expired. Please login again.');
+            Modal.close();
+            return;
+        }
+        
+        try {
+            // Get user data
+            const response = await FirebaseAPI.getUserByUsername(pending.username);
+            if (!response.success || !response.data) {
+                throw new Error('User not found');
+            }
+            
+            const user = response.data;
+            
+            // Verify 2FA code
+            const isValid = AuthSecurity.verify2FACode(user.twoFactorSecret, code);
+            
+            if (isValid) {
+                // Create session
+                const session = AuthSecurity.createSession(user);
+                
+                AppState.currentUser = {
+                    id: user.id,
+                    username: user.username,
+                    role: user.role,
+                    permissions: user.permissions,
+                    sessionToken: session.token
+                };
+                
+                // Clear pending 2FA
+                sessionStorage.removeItem('pending2FA');
+                
+                // Log successful 2FA
+                await AuthSecurity.logSecurityEvent({
+                    type: 'login',
+                    username: user.username,
+                    action: '2fa_success',
+                    success: true
+                });
+                
+                Modal.close();
+                this.showDashboard();
+                Notification.success(`Welcome back, ${user.username}!`);
+            } else {
+                await AuthSecurity.logSecurityEvent({
+                    type: 'login',
+                    username: user.username,
+                    action: '2fa_failed',
+                    success: false
+                });
+                
+                Notification.error('Invalid 2FA code. Please try again.');
+            }
+        } catch (error) {
+            console.error('2FA verification error:', error);
+            Notification.error('2FA verification failed. Please try again.');
+        }
     },
     
     showDashboard() {
@@ -3242,12 +3464,30 @@ const UserManagement = {
             <form id="userForm" class="form">
                 <div class="form-group">
                     <label for="username">Username *</label>
-                    <input type="text" id="username" name="username" required>
+                    <input type="text" id="username" name="username" required
+                           pattern="[a-zA-Z0-9_]{3,20}"
+                           title="3-20 characters, letters, numbers, and underscore only">
+                    <small class="form-help">3-20 characters, alphanumeric and underscore only</small>
                 </div>
                 
                 <div class="form-group">
                     <label for="password">Password *</label>
-                    <input type="password" id="password" name="password" required>
+                    <input type="password" id="password" name="password" required
+                           minlength="8">
+                    <div id="passwordStrength" class="password-strength" style="display: none;">
+                        <div class="strength-bar">
+                            <div class="strength-fill"></div>
+                        </div>
+                        <span class="strength-text"></span>
+                    </div>
+                    <small class="form-help">Minimum 8 characters with uppercase, lowercase, number, and special character</small>
+                    <div id="passwordErrors" class="password-errors"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password *</label>
+                    <input type="password" id="confirmPassword" name="confirmPassword" required>
+                    <small id="passwordMatch" class="form-help"></small>
                 </div>
                 
                 <div class="form-group">
@@ -3267,6 +3507,14 @@ const UserManagement = {
                 </div>
                 
                 <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="enable2FA" name="enable2FA">
+                        Enable Two-Factor Authentication (2FA)
+                    </label>
+                    <small class="form-help">User will need to set up 2FA on first login</small>
+                </div>
+                
+                <div class="form-group">
                     <label>Module Permissions</label>
                     <div class="permissions-grid">
                         ${this.renderPermissionCheckboxes()}
@@ -3275,14 +3523,72 @@ const UserManagement = {
                 
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="Modal.hide()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add User</button>
+                    <button type="submit" class="btn btn-primary" id="submitUserBtn">Add User</button>
                 </div>
             </form>
         `;
         
         Modal.show('Add New User', content, 'large');
         
-        document.getElementById('userForm').addEventListener('submit', (e) => {
+        const form = document.getElementById('userForm');
+        const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('confirmPassword');
+        const submitBtn = document.getElementById('submitUserBtn');
+        
+        // Password strength indicator
+        passwordInput.addEventListener('input', () => {
+            const password = passwordInput.value;
+            const strengthDiv = document.getElementById('passwordStrength');
+            const errorsDiv = document.getElementById('passwordErrors');
+            
+            if (password.length > 0) {
+                strengthDiv.style.display = 'block';
+                const validation = AuthSecurity.validatePassword(password);
+                const strengthInfo = AuthSecurity.getPasswordStrengthLabel(validation.strength);
+                
+                const strengthFill = strengthDiv.querySelector('.strength-fill');
+                const strengthText = strengthDiv.querySelector('.strength-text');
+                
+                strengthFill.style.width = validation.strength + '%';
+                strengthFill.style.backgroundColor = strengthInfo.color;
+                strengthText.textContent = strengthInfo.label;
+                strengthText.style.color = strengthInfo.color;
+                
+                if (!validation.valid) {
+                    errorsDiv.innerHTML = '<ul>' + validation.errors.map(e => `<li>${e}</li>`).join('') + '</ul>';
+                    errorsDiv.style.color = '#ef4444';
+                } else {
+                    errorsDiv.innerHTML = '<span style="color: #10b981;">✓ Password meets requirements</span>';
+                }
+            } else {
+                strengthDiv.style.display = 'none';
+                errorsDiv.innerHTML = '';
+            }
+        });
+        
+        // Password match validation
+        const checkPasswordMatch = () => {
+            const password = passwordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+            const matchDiv = document.getElementById('passwordMatch');
+            
+            if (confirmPassword.length > 0) {
+                if (password === confirmPassword) {
+                    matchDiv.textContent = '✓ Passwords match';
+                    matchDiv.style.color = '#10b981';
+                } else {
+                    matchDiv.textContent = '✗ Passwords do not match';
+                    matchDiv.style.color = '#ef4444';
+                }
+            } else {
+                matchDiv.textContent = '';
+            }
+        };
+        
+        passwordInput.addEventListener('input', checkPasswordMatch);
+        confirmPasswordInput.addEventListener('input', checkPasswordMatch);
+        
+        form.addEventListener('submit', (e) => {
             e.preventDefault();
             this.handleAdd(e.target);
         });
@@ -3325,7 +3631,39 @@ const UserManagement = {
     
     async handleAdd(form) {
         const formData = new FormData(form);
+        const username = AuthSecurity.sanitizeInput(formData.get('username'));
+        const password = formData.get('password');
+        const confirmPassword = formData.get('confirmPassword');
         const role = formData.get('role');
+        
+        // Validate username
+        if (!AuthSecurity.validateUsername(username)) {
+            Notification.error('Invalid username format. Use 3-20 alphanumeric characters and underscore only.');
+            return;
+        }
+        
+        // Validate password
+        const passwordValidation = AuthSecurity.validatePassword(password);
+        if (!passwordValidation.valid) {
+            Notification.error('Password does not meet requirements: ' + passwordValidation.errors.join(', '));
+            return;
+        }
+        
+        // Check password match
+        if (password !== confirmPassword) {
+            Notification.error('Passwords do not match');
+            return;
+        }
+        
+        // Check if username already exists
+        const existingUser = await FirebaseAPI.getUserByUsername(username);
+        if (existingUser.success && existingUser.data) {
+            Notification.error('Username already exists');
+            return;
+        }
+        
+        // Hash password
+        const { hash, salt } = await AuthSecurity.hashPassword(password);
         
         // Build permissions object
         const permissions = {};
@@ -3345,20 +3683,44 @@ const UserManagement = {
         }
         
         const userData = {
-            username: formData.get('username'),
-            password: formData.get('password'), // In production, hash this!
+            username: username,
+            passwordHash: hash,
+            passwordSalt: salt,
             role: role,
             status: formData.get('status'),
-            permissions: role === 'admin' ? null : permissions
+            permissions: role === 'admin' ? null : permissions,
+            twoFactorEnabled: formData.get('enable2FA') === 'on',
+            twoFactorSecret: formData.get('enable2FA') === 'on' ? AuthSecurity.generate2FASecret() : null,
+            createdBy: AppState.currentUser?.username || 'system',
+            passwordChangedAt: Date.now()
         };
         
         try {
             await FirebaseAPI.addUser(userData);
+            
+            // Log security event
+            await AuthSecurity.logSecurityEvent({
+                type: 'user_management',
+                username: AppState.currentUser?.username,
+                action: 'user_created',
+                success: true,
+                details: { newUser: username, role: role }
+            });
+            
             Notification.success('User added successfully');
             Modal.hide();
             await this.loadData();
         } catch (error) {
+            console.error('Add user error:', error);
             Notification.error('Failed to add user: ' + error.message);
+            
+            await AuthSecurity.logSecurityEvent({
+                type: 'user_management',
+                username: AppState.currentUser?.username,
+                action: 'user_create_failed',
+                success: false,
+                details: { error: error.message }
+            });
         }
     },
     

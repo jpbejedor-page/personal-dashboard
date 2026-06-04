@@ -5,10 +5,9 @@
 const CONFIG = {
     // Authentication
     auth: {
-        // Hardcoded credentials (for demo purposes)
-        // In production, use proper authentication
-        username: 'jayps',
-        password: 'Y@hWeh101!',
+        // SECURITY: Config-based authentication has been removed for security
+        // All users must be created in Firebase with hashed passwords
+        // See FIREBASE_ADMIN_SETUP.md for initial admin user creation
         
         // Google OAuth Client ID (replace with your own)
         googleClientId: '1026123058562-r5jvr38qj3510g5jljglquehf2mvivif.apps.googleusercontent.com',

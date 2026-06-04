@@ -24,6 +24,18 @@ A flexible, modular, and responsive static website for tracking blood sugar leve
 - ✅ Mobile-friendly navigation
 - ✅ Offline-capable (with mock data)
 
+### 🔒 Security Features
+- ✅ **Secure Authentication** - SHA-256 password hashing with salt
+- ✅ **Session Management** - Token-based sessions with automatic expiration (1 hour)
+- ✅ **Rate Limiting** - Brute force protection (5 attempts, 15-min lockout)
+- ✅ **Two-Factor Authentication** - Optional 2FA support with TOTP
+- ✅ **Password Validation** - Enforced strong password requirements
+- ✅ **Audit Logging** - Comprehensive security event tracking
+- ✅ **Input Sanitization** - Protection against injection attacks
+- ✅ **Account Controls** - User activation/deactivation
+- ✅ **Password Reset** - Secure password reset with token validation
+- ✅ **Session Monitoring** - Automatic logout on inactivity
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -159,9 +171,15 @@ git push -u origin main
 
 ## 📱 Usage Guide
 
-### Login
-- **Default credentials**: username: `admin`, password: `admin123`
-- Change these in `config.js` before deployment
+### Login & Security
+- **Default credentials**: username: `jayps`, password: `Y@hWeh101!`
+- **⚠️ IMPORTANT**: Change default credentials immediately after first login
+- **Security Features**:
+  - Strong password requirements (8+ chars, uppercase, lowercase, number, special char)
+  - Rate limiting: 5 failed attempts = 15-minute lockout
+  - Session timeout: 1 hour of inactivity
+  - Optional 2FA for enhanced security
+- See [SECURITY_GUIDE.md](SECURITY_GUIDE.md) for detailed security information
 
 ### Overview Module
 - View summary statistics for all modules
