@@ -2551,17 +2551,30 @@ const SimpleLoanTracker = {
 // ===================================
 const Documents = {
     currentDoc: 'terms',
+    initialized: false,
     
     init() {
+        if (this.initialized) {
+            // Just reload the current document if already initialized
+            this.loadDocument(this.currentDoc);
+            return;
+        }
+        
         this.setupEventListeners();
         this.loadDocument('terms');
+        this.initialized = true;
+        console.log('Documents module initialized');
     },
     
     setupEventListeners() {
         // Tab switching
-        document.querySelectorAll('.doc-tab').forEach(tab => {
+        const tabs = document.querySelectorAll('.doc-tab');
+        console.log('Setting up event listeners for', tabs.length, 'tabs');
+        
+        tabs.forEach(tab => {
             tab.addEventListener('click', (e) => {
                 const docType = e.currentTarget.dataset.doc;
+                console.log('Switching to document:', docType);
                 this.switchDocument(docType);
             });
         });
@@ -2589,26 +2602,41 @@ const Documents = {
     
     async loadDocument(docType) {
         const viewer = document.getElementById(`doc-${docType}`);
+        if (!viewer) {
+            console.error('Document viewer not found for:', docType);
+            return;
+        }
+        
         const filename = docType === 'terms' ? 'TERMS.md' : 'NOTES.md';
+        console.log('Loading document:', filename);
         
         try {
             viewer.innerHTML = '<div class="loading-spinner"></div><p>Loading document...</p>';
             
             const response = await fetch(filename);
+            console.log('Fetch response:', response.status, response.statusText);
+            
             if (!response.ok) {
-                throw new Error('Document not found');
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             
             const markdown = await response.text();
+            console.log('Markdown loaded, length:', markdown.length);
+            
             const html = this.parseMarkdown(markdown);
+            console.log('HTML generated, length:', html.length);
+            
             viewer.innerHTML = html;
+            console.log('Document rendered successfully');
         } catch (error) {
             console.error('Error loading document:', error);
             viewer.innerHTML = `
                 <div style="text-align: center; padding: 2rem; color: var(--danger-color);">
                     <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 1rem;"></i>
                     <h3>Failed to load document</h3>
+                    <p>Error: ${error.message}</p>
                     <p>The document file could not be loaded. Please make sure ${filename} exists in your repository.</p>
+                    <p><small>Check the browser console for more details.</small></p>
                 </div>
             `;
         }
