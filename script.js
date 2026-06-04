@@ -661,9 +661,15 @@ const Dashboard = {
             budget: 'Salary Budget',
             financial: 'Financial',
             lending: 'Lending Business',
+            documents: 'Documents',
             users: 'User Management'
         };
         document.querySelector('.mobile-title').textContent = titles[moduleName] || 'Dashboard';
+        
+        // Initialize Documents module if switching to it
+        if (moduleName === 'documents' && typeof Documents !== 'undefined') {
+            Documents.init();
+        }
         
         AppState.currentModule = moduleName;
     },
@@ -2536,6 +2542,122 @@ const SimpleLoanTracker = {
         } catch (error) {
             Notification.error('Failed to delete simple loan');
         }
+    }
+};
+
+
+// ===================================
+// Documents Module
+// ===================================
+const Documents = {
+    currentDoc: 'terms',
+    
+    init() {
+        this.setupEventListeners();
+        this.loadDocument('terms');
+    },
+    
+    setupEventListeners() {
+        // Tab switching
+        document.querySelectorAll('.doc-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const docType = e.currentTarget.dataset.doc;
+                this.switchDocument(docType);
+            });
+        });
+    },
+    
+    switchDocument(docType) {
+        // Update active tab
+        document.querySelectorAll('.doc-tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        document.querySelector(`[data-doc="${docType}"]`).classList.add('active');
+        
+        // Show selected document
+        document.querySelectorAll('.doc-viewer').forEach(viewer => {
+            viewer.style.display = 'none';
+        });
+        document.getElementById(`doc-${docType}`).style.display = 'block';
+        
+        // Load document if not already loaded
+        if (this.currentDoc !== docType) {
+            this.currentDoc = docType;
+            this.loadDocument(docType);
+        }
+    },
+    
+    async loadDocument(docType) {
+        const viewer = document.getElementById(`doc-${docType}`);
+        const filename = docType === 'terms' ? 'TERMS.md' : 'NOTES.md';
+        
+        try {
+            viewer.innerHTML = '<div class="loading-spinner"></div><p>Loading document...</p>';
+            
+            const response = await fetch(filename);
+            if (!response.ok) {
+                throw new Error('Document not found');
+            }
+            
+            const markdown = await response.text();
+            const html = this.parseMarkdown(markdown);
+            viewer.innerHTML = html;
+        } catch (error) {
+            console.error('Error loading document:', error);
+            viewer.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: var(--danger-color);">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                    <h3>Failed to load document</h3>
+                    <p>The document file could not be loaded. Please make sure ${filename} exists in your repository.</p>
+                </div>
+            `;
+        }
+    },
+    
+    parseMarkdown(markdown) {
+        // Simple markdown parser
+        let html = markdown;
+        
+        // Headers
+        html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+        html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+        html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+        
+        // Bold
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        
+        // Italic
+        html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        
+        // Links
+        html = html.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
+        
+        // Code
+        html = html.replace(/`(.*?)`/g, '<code>$1</code>');
+        
+        // Horizontal rule
+        html = html.replace(/^---$/gim, '<hr>');
+        
+        // Lists - Unordered
+        html = html.replace(/^\- (.*$)/gim, '<li>$1</li>');
+        html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+        
+        // Lists - Ordered
+        html = html.replace(/^\d+\. (.*$)/gim, '<li>$1</li>');
+        
+        // Checkboxes
+        html = html.replace(/\[ \]/g, '<input type="checkbox" disabled>');
+        html = html.replace(/\[x\]/gi, '<input type="checkbox" checked disabled>');
+        
+        // Paragraphs
+        html = html.split('\n\n').map(para => {
+            if (!para.match(/^<[h|u|o|l|d]/)) {
+                return `<p>${para.replace(/\n/g, '<br>')}</p>`;
+            }
+            return para;
+        }).join('\n');
+        
+        return html;
     }
 };
 

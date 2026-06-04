@@ -81,6 +81,10 @@
                     <i class="fas fa-hand-holding-usd"></i>
                     <span>Lending Business</span>
                 </li>
+                <li class="nav-item" data-module="documents">
+                    <i class="fas fa-file-alt"></i>
+                    <span>Documents</span>
+                </li>
                 <li class="nav-item admin-only" data-module="users" style="display: none;">
                     <i class="fas fa-users-cog"></i>
                     <span>User Management</span>
@@ -441,6 +445,59 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Documents Module -->
+            <section id="documents-module" class="module" style="display: none;">
+                <div class="module-header">
+                    <h2><i class="fas fa-file-alt"></i> Documents</h2>
+                    <div class="module-header-actions">
+                        <a href="https://github.com/jpbejedor-page/personal-dashboard/edit/main/TERMS.md" target="_blank" class="btn btn-secondary">
+                            <i class="fas fa-edit"></i> Edit Terms
+                        </a>
+                        <a href="https://github.com/jpbejedor-page/personal-dashboard/edit/main/NOTES.md" target="_blank" class="btn btn-secondary">
+                            <i class="fas fa-edit"></i> Edit Notes
+                        </a>
+                    </div>
+                </div>
+                <div class="module-content">
+                    <div class="documents-container">
+                        <!-- Document Tabs -->
+                        <div class="document-tabs">
+                            <button class="doc-tab active" data-doc="terms">
+                                <i class="fas fa-gavel"></i> Terms & Conditions
+                            </button>
+                            <button class="doc-tab" data-doc="notes">
+                                <i class="fas fa-sticky-note"></i> Business Notes
+                            </button>
+                        </div>
+                        
+                        <!-- Document Content -->
+                        <div class="document-content">
+                            <div id="doc-terms" class="doc-viewer active">
+                                <div class="loading-spinner"></div>
+                                <p>Loading Terms & Conditions...</p>
+                            </div>
+                            <div id="doc-notes" class="doc-viewer" style="display: none;">
+                                <div class="loading-spinner"></div>
+                                <p>Loading Business Notes...</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Instructions -->
+                        <div class="document-instructions">
+                            <h4><i class="fas fa-info-circle"></i> How to Update Documents</h4>
+                            <ol>
+                                <li>Click the "Edit Terms" or "Edit Notes" button above</li>
+                                <li>You'll be taken to GitHub's file editor</li>
+                                <li>Make your changes in the editor</li>
+                                <li>Scroll down and click "Commit changes"</li>
+                                <li>Refresh this page to see your updates</li>
+                            </ol>
+                            <p><strong>Note:</strong> Documents are stored as Markdown files in your repository and are version controlled.</p>
+                        </div>
                     </div>
                 </div>
             </section>

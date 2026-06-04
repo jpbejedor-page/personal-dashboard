@@ -1688,3 +1688,157 @@ body.dark-mode .budget-summary-item {
     color: var(--text-tertiary);
     font-style: italic;
 }
+
+/* ===================================
+   Documents Module Styles
+   =================================== */
+.documents-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.document-tabs {
+    display: flex;
+    gap: var(--spacing-sm);
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: var(--spacing-sm);
+}
+
+.doc-tab {
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.doc-tab:hover {
+    color: var(--primary-color);
+    background: var(--bg-secondary);
+}
+
+.doc-tab.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.document-content {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-xl);
+    min-height: 400px;
+}
+
+.doc-viewer {
+    line-height: 1.8;
+}
+
+.doc-viewer h1 {
+    font-size: 2rem;
+    margin-bottom: var(--spacing-lg);
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: var(--spacing-md);
+}
+
+.doc-viewer h2 {
+    font-size: 1.5rem;
+    margin-top: var(--spacing-xl);
+    margin-bottom: var(--spacing-md);
+    color: var(--text-primary);
+}
+
+.doc-viewer h3 {
+    font-size: 1.25rem;
+    margin-top: var(--spacing-lg);
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-primary);
+}
+
+.doc-viewer p {
+    margin-bottom: var(--spacing-md);
+    color: var(--text-secondary);
+}
+
+.doc-viewer ul, .doc-viewer ol {
+    margin-left: var(--spacing-xl);
+    margin-bottom: var(--spacing-md);
+    color: var(--text-secondary);
+}
+
+.doc-viewer li {
+    margin-bottom: var(--spacing-sm);
+}
+
+.doc-viewer strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.doc-viewer code {
+    background: var(--bg-tertiary);
+    padding: 0.2rem 0.4rem;
+    border-radius: var(--radius-sm);
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+}
+
+.doc-viewer hr {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: var(--spacing-xl) 0;
+}
+
+.document-instructions {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+}
+
+.document-instructions h4 {
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-md);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.document-instructions ol {
+    margin-left: var(--spacing-xl);
+    margin-bottom: var(--spacing-md);
+}
+
+.document-instructions li {
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-secondary);
+}
+
+.document-instructions p {
+    color: var(--text-secondary);
+    margin-top: var(--spacing-md);
+}
+
+@media (max-width: 768px) {
+    .document-tabs {
+        flex-direction: column;
+    }
+    
+    .doc-tab {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .document-content {
+        padding: var(--spacing-md);
+    }
+}
