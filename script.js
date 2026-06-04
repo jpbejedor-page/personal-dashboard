@@ -1681,6 +1681,7 @@ const Lending = {
                         <select id="lendTermsType" required>
                             <option value="Daily">Daily</option>
                             <option value="Weekly">Weekly</option>
+                            <option value="Semi-Monthly">Semi-Monthly</option>
                             <option value="Monthly" selected>Monthly</option>
                         </select>
                     </div>
@@ -1930,6 +1931,10 @@ const Lending = {
                 break;
             case 'Weekly':
                 date.setDate(date.getDate() + (periodNumber * 7));
+                break;
+            case 'Semi-Monthly':
+                // Semi-monthly: 15 days apart (approximately twice a month)
+                date.setDate(date.getDate() + (periodNumber * 15));
                 break;
             case 'Monthly':
                 date.setMonth(date.getMonth() + periodNumber);
