@@ -815,7 +815,31 @@ const Overview = {
         const bloodSugarData = AppState.data.bloodSugar;
         if (bloodSugarData.length > 0) {
             const latest = bloodSugarData[bloodSugarData.length - 1];
-            document.getElementById('latestBloodSugar').textContent = latest.level || '--';
+            const levelElement = document.getElementById('latestBloodSugar');
+            const labelElement = levelElement.nextElementSibling;
+            
+            if (latest.level) {
+                levelElement.textContent = latest.level;
+                // Format the datetime to show date and time
+                if (latest.datetime) {
+                    const date = new Date(latest.datetime);
+                    const formattedDate = date.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                    });
+                    const formattedTime = date.toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    labelElement.textContent = `mg/dL (${formattedDate} ${formattedTime})`;
+                } else {
+                    labelElement.textContent = 'mg/dL';
+                }
+            } else {
+                levelElement.textContent = '--';
+                labelElement.textContent = 'mg/dL';
+            }
         }
         
         // Financial stats (current month)
