@@ -1737,6 +1737,7 @@ const Lending = {
                         <select id="lendTermsType" required>
                             <option value="Daily" ${record.paymentTerms === 'Daily' ? 'selected' : ''}>Daily</option>
                             <option value="Weekly" ${record.paymentTerms === 'Weekly' ? 'selected' : ''}>Weekly</option>
+                            <option value="Semi-Monthly" ${record.paymentTerms === 'Semi-Monthly' ? 'selected' : ''}>Semi-Monthly</option>
                             <option value="Monthly" ${record.paymentTerms === 'Monthly' ? 'selected' : ''}>Monthly</option>
                         </select>
                     </div>
