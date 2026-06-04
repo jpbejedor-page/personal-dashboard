@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Documents Module</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .doc-viewer { border: 1px solid #ccc; padding: 20px; margin: 20px 0; }
+        button { padding: 10px 20px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Documents Module Test</h1>
+    <button onclick="testFetch()">Test Fetch TERMS.md</button>
+    <button onclick="testParse()">Test Parse Markdown</button>
+    
+    <div id="output" class="doc-viewer"></div>
+    
+    <script>
+        async function testFetch() {
+            const output = document.getElementById('output');
+            output.innerHTML = 'Fetching TERMS.md...';
+            
+            try {
+                const response = await fetch('TERMS.md');
+                console.log('Response:', response);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const text = await response.text();
+                output.innerHTML = `<h3>Success!</h3><pre>${text.substring(0, 500)}...</pre>`;
+            } catch (error) {
+                output.innerHTML = `<h3>Error!</h3><p>${error.message}</p>`;
+                console.error(error);
+            }
+        }
+        
+        function testParse() {
+            const markdown = `# Test Header\n\n## Subheader\n\nThis is **bold** and this is *italic*.\n\n- Item 1\n- Item 2\n\n1. First\n2. Second`;
+            const output = document.getElementById('output');
+            
+            // Simple parser
+            let html = markdown;
+            html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+            html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+            html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            output.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
