@@ -363,11 +363,14 @@ const Dashboard = {
     applyPermissions() {
         const isAdmin = AppState.isAdmin();
         
-        // Show/hide User Management for admins only
-        const userManagementNav = document.querySelector('.nav-item[data-module="users"]');
-        if (userManagementNav) {
-            userManagementNav.style.display = isAdmin ? 'flex' : 'none';
-        }
+        // Show/hide admin-only modules
+        const adminOnlyModules = ['documents', 'users'];
+        adminOnlyModules.forEach(module => {
+            const navItem = document.querySelector(`.nav-item[data-module="${module}"]`);
+            if (navItem) {
+                navItem.style.display = isAdmin ? 'flex' : 'none';
+            }
+        });
         
         // If not admin, hide/disable modules based on permissions
         if (!isAdmin) {
@@ -420,6 +423,11 @@ const Dashboard = {
     },
     
     switchModule(moduleName) {
+        if (moduleName === 'documents' && !AppState.isAdmin()) {
+            Notification.error('Documents module is available to admins only.');
+            return;
+        }
+
         // Update active nav item
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.remove('active');
