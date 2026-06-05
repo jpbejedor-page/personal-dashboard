@@ -115,7 +115,7 @@
                     </button>
                 </div>
                 <div class="overview-grid">
-                    <div class="stat-card">
+                    <div class="stat-card" data-overview-module="blood-sugar">
                         <div class="stat-icon blood-sugar-icon">
                             <i class="fas fa-heartbeat"></i>
                         </div>
@@ -125,7 +125,7 @@
                             <p class="stat-label">mg/dL</p>
                         </div>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card" data-overview-module="financial">
                         <div class="stat-icon income-icon">
                             <i class="fas fa-arrow-up"></i>
                         </div>
@@ -135,7 +135,7 @@
                             <p class="stat-label">This month</p>
                         </div>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card" data-overview-module="financial">
                         <div class="stat-icon expense-icon">
                             <i class="fas fa-arrow-down"></i>
                         </div>
@@ -145,7 +145,7 @@
                             <p class="stat-label">This month</p>
                         </div>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card" data-overview-module="lending">
                         <div class="stat-icon lending-icon">
                             <i class="fas fa-hand-holding-usd"></i>
                         </div>
@@ -155,7 +155,7 @@
                             <p class="stat-label">Outstanding</p>
                         </div>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card" data-overview-module="payroll">
                         <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                             <i class="fas fa-users"></i>
                         </div>
@@ -165,7 +165,7 @@
                             <p class="stat-label">All projects</p>
                         </div>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card" data-overview-module="payroll">
                         <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
                             <i class="fas fa-money-bill-wave"></i>
                         </div>
@@ -196,7 +196,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="charts-container">
+                <div class="charts-container" data-overview-module="overview">
                     <div class="chart-card">
                         <div class="chart-header">
                             <h3>IBM Stock Historical Data</h3>
@@ -215,7 +215,7 @@
                     </div>
                 </div>
                 <div class="charts-container">
-                    <div class="chart-card">
+                    <div class="chart-card" data-overview-module="blood-sugar">
                         <div class="chart-header">
                             <h3>Blood Sugar Trend</h3>
                             <div class="chart-controls">
@@ -230,7 +230,7 @@
                         </div>
                         <canvas id="bloodSugarChart"></canvas>
                     </div>
-                    <div class="chart-card">
+                    <div class="chart-card" data-overview-module="financial">
                         <h3>Financial Overview</h3>
                         <canvas id="financialChart"></canvas>
                     </div>

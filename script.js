@@ -576,10 +576,23 @@ const Dashboard = {
 // ===================================
 const Overview = {
     init() {
+        this.applyVisibilityRules();
         this.updateStats();
         this.initCharts();
         this.setupEventListeners();
         this.fetchMarketData();
+    },
+
+    canShowSection(moduleName) {
+        return AppState.isAdmin() || AppState.hasPermission(moduleName, 'view');
+    },
+
+    applyVisibilityRules() {
+        const overviewItems = document.querySelectorAll('[data-overview-module]');
+        overviewItems.forEach(item => {
+            const moduleName = item.dataset.overviewModule;
+            item.style.display = this.canShowSection(moduleName) ? '' : 'none';
+        });
     },
     
     setupEventListeners() {
@@ -609,6 +622,10 @@ const Overview = {
     },
     
     async fetchMarketData() {
+        if (!this.canShowSection('overview')) {
+            return;
+        }
+
         // Fetch both IBM stock and currency data
         await Promise.all([
             this.fetchIBMStockData('1M'),
@@ -851,105 +868,108 @@ const Overview = {
     },
     
     async updateStats() {
-        // Latest Blood Sugar
-        const bloodSugarData = AppState.data.bloodSugar;
-        const levelElement = document.getElementById('latestBloodSugar');
-        const labelElement = levelElement?.nextElementSibling;
-        
-        if (bloodSugarData.length > 0 && levelElement && labelElement) {
-            const latest = bloodSugarData.reduce((latestRecord, currentRecord) => {
-                const latestTime = new Date(latestRecord.datetime || latestRecord.date || 0).getTime();
-                const currentTime = new Date(currentRecord.datetime || currentRecord.date || 0).getTime();
-                return currentTime > latestTime ? currentRecord : latestRecord;
-            });
+        if (this.canShowSection('blood-sugar')) {
+            const bloodSugarData = AppState.data.bloodSugar;
+            const levelElement = document.getElementById('latestBloodSugar');
+            const labelElement = levelElement?.nextElementSibling;
             
-            if (latest.level) {
-                levelElement.textContent = latest.level;
-                if (latest.datetime || latest.date) {
-                    const date = new Date(latest.datetime || latest.date);
-                    const formattedDate = date.toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                    });
-                    const formattedTime = date.toLocaleTimeString('en-US', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
-                    labelElement.textContent = `mg/dL (${formattedDate} ${formattedTime})`;
+            if (bloodSugarData.length > 0 && levelElement && labelElement) {
+                const latest = bloodSugarData.reduce((latestRecord, currentRecord) => {
+                    const latestTime = new Date(latestRecord.datetime || latestRecord.date || 0).getTime();
+                    const currentTime = new Date(currentRecord.datetime || currentRecord.date || 0).getTime();
+                    return currentTime > latestTime ? currentRecord : latestRecord;
+                });
+                
+                if (latest.level) {
+                    levelElement.textContent = latest.level;
+                    if (latest.datetime || latest.date) {
+                        const date = new Date(latest.datetime || latest.date);
+                        const formattedDate = date.toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                        });
+                        const formattedTime = date.toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                        labelElement.textContent = `mg/dL (${formattedDate} ${formattedTime})`;
+                    } else {
+                        labelElement.textContent = 'mg/dL';
+                    }
                 } else {
+                    levelElement.textContent = '--';
                     labelElement.textContent = 'mg/dL';
                 }
-            } else {
-                levelElement.textContent = '--';
-                labelElement.textContent = 'mg/dL';
             }
         }
         
-        // Financial stats (current month)
-        const currentMonth = new Date().toISOString().slice(0, 7);
-        const monthlyFinancial = AppState.data.financial.filter(item =>
-            item.date && item.date.startsWith(currentMonth)
-        );
+        if (this.canShowSection('financial')) {
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            const monthlyFinancial = AppState.data.financial.filter(item =>
+                item.date && item.date.startsWith(currentMonth)
+            );
+            
+            const income = monthlyFinancial
+                .filter(item => item.category === 'Income')
+                .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+            
+            const expenses = monthlyFinancial
+                .filter(item => item.category === 'Expense')
+                .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+            
+            document.getElementById('totalIncome').textContent = Utils.formatCurrency(income);
+            document.getElementById('totalExpenses').textContent = Utils.formatCurrency(expenses);
+        }
         
-        const income = monthlyFinancial
-            .filter(item => item.category === 'Income')
-            .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+        if (this.canShowSection('lending')) {
+            const activeLoans = AppState.data.lending.filter(item =>
+                item.status === 'Active' || item.status === 'Overdue'
+            ).length;
+            
+            const activeSimpleLoans = AppState.data.simpleLoans.filter(item => {
+                const details = SimpleLoanTracker.calculateLoanDetails(item);
+                return details.balance > 0;
+            }).length;
+            
+            const totalActiveLoans = activeLoans + activeSimpleLoans;
+            document.getElementById('activeLoans').textContent = totalActiveLoans;
+        }
         
-        const expenses = monthlyFinancial
-            .filter(item => item.category === 'Expense')
-            .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
-        
-        document.getElementById('totalIncome').textContent = Utils.formatCurrency(income);
-        document.getElementById('totalExpenses').textContent = Utils.formatCurrency(expenses);
-        
-        // Active loans (including simple loans)
-        const activeLoans = AppState.data.lending.filter(item =>
-            item.status === 'Active' || item.status === 'Overdue'
-        ).length;
-        
-        const activeSimpleLoans = AppState.data.simpleLoans.filter(item => {
-            const details = SimpleLoanTracker.calculateLoanDetails(item);
-            return details.balance > 0;
-        }).length;
-        
-        const totalActiveLoans = activeLoans + activeSimpleLoans;
-        
-        document.getElementById('activeLoans').textContent = totalActiveLoans;
-        
-        // Payroll stats - aggregate all projects directly
-        const totalEmployeesElement = document.getElementById('totalEmployees');
-        const totalPayrollElement = document.getElementById('totalPayroll');
-        
-        if (totalEmployeesElement && totalPayrollElement && typeof FirebaseAPI !== 'undefined' && typeof PayrollModule !== 'undefined') {
-            try {
-                const projectsResponse = await FirebaseAPI.getPayrollProjects();
-                const projects = projectsResponse.data || [];
-                let allEmployees = [];
-                
-                for (const project of projects) {
-                    const employeesResponse = await FirebaseAPI.getProjectEmployees(project.id);
-                    const projectEmployees = employeesResponse.data || [];
-                    allEmployees = allEmployees.concat(projectEmployees);
+        if (this.canShowSection('payroll')) {
+            const totalEmployeesElement = document.getElementById('totalEmployees');
+            const totalPayrollElement = document.getElementById('totalPayroll');
+            
+            if (totalEmployeesElement && totalPayrollElement && typeof FirebaseAPI !== 'undefined' && typeof PayrollModule !== 'undefined') {
+                try {
+                    const projectsResponse = await FirebaseAPI.getPayrollProjects();
+                    const projects = projectsResponse.data || [];
+                    let allEmployees = [];
+                    
+                    for (const project of projects) {
+                        const employeesResponse = await FirebaseAPI.getProjectEmployees(project.id);
+                        const projectEmployees = employeesResponse.data || [];
+                        allEmployees = allEmployees.concat(projectEmployees);
+                    }
+                    
+                    const totalEmployees = allEmployees.length;
+                    const totalPayroll = allEmployees.reduce((total, employee) => {
+                        const grossPay = PayrollModule.calculateGrossPay(employee);
+                        const deductions = PayrollModule.calculateDeductions(employee);
+                        return total + (grossPay - deductions);
+                    }, 0);
+                    
+                    totalEmployeesElement.textContent = totalEmployees;
+                    totalPayrollElement.textContent = Utils.formatCurrency(totalPayroll);
+                } catch (error) {
+                    console.error('Error loading overview payroll stats:', error);
+                    totalEmployeesElement.textContent = '0';
+                    totalPayrollElement.textContent = '₱0.00';
                 }
-                
-                const totalEmployees = allEmployees.length;
-                const totalPayroll = allEmployees.reduce((total, employee) => {
-                    const grossPay = PayrollModule.calculateGrossPay(employee);
-                    const deductions = PayrollModule.calculateDeductions(employee);
-                    return total + (grossPay - deductions);
-                }, 0);
-                
-                totalEmployeesElement.textContent = totalEmployees;
-                totalPayrollElement.textContent = Utils.formatCurrency(totalPayroll);
-            } catch (error) {
-                console.error('Error loading overview payroll stats:', error);
+            } else if (totalEmployeesElement && totalPayrollElement) {
                 totalEmployeesElement.textContent = '0';
                 totalPayrollElement.textContent = '₱0.00';
             }
-        } else if (totalEmployeesElement && totalPayrollElement) {
-            totalEmployeesElement.textContent = '0';
-            totalPayrollElement.textContent = '₱0.00';
         }
     },
     
@@ -958,8 +978,12 @@ const Overview = {
             return;
         }
         
-        this.createBloodSugarChart();
-        this.createFinancialChart();
+        if (this.canShowSection('blood-sugar')) {
+            this.createBloodSugarChart();
+        }
+        if (this.canShowSection('financial')) {
+            this.createFinancialChart();
+        }
     },
     
     createBloodSugarChart(daysFilter = 'all') {
