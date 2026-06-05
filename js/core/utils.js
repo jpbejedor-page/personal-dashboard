@@ -181,6 +181,85 @@ const Utils = {
                 XLSX.utils.book_append_sheet(wb, ws4, 'Lending');
             }
             
+            // Simple Loans Data
+            if (AppState.data.simpleLoans && AppState.data.simpleLoans.length > 0) {
+                const simpleLoansData = AppState.data.simpleLoans.map(item => {
+                    const principal = parseFloat(item.principal || 0);
+                    const totalPayments = (item.payments || []).reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+                    const totalCharges = (item.charges || []).reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
+                    const balance = principal + totalCharges - totalPayments;
+                    
+                    return {
+                        'Borrower': item.borrower,
+                        'Date': this.formatDate(item.date),
+                        'Principal': principal,
+                        'Total Payments': totalPayments,
+                        'Total Charges': totalCharges,
+                        'Balance': balance,
+                        'Status': balance <= 0 ? 'Paid' : 'Active',
+                        'Notes': item.notes || ''
+                    };
+                });
+                const ws5 = XLSX.utils.json_to_sheet(simpleLoansData);
+                XLSX.utils.book_append_sheet(wb, ws5, 'Simple Loans');
+            }
+            
+            // Payroll Data - Projects
+            if (typeof PayrollModule !== 'undefined' && PayrollModule.projects && PayrollModule.projects.length > 0) {
+                const payrollData = [];
+                
+                PayrollModule.projects.forEach(project => {
+                    // Add project header
+                    payrollData.push({
+                        'Project': project.name,
+                        'Employee Name': '',
+                        'Type': '',
+                        'Rate/Salary': '',
+                        'Days Worked': '',
+                        'Gross Pay': '',
+                        'Deductions': '',
+                        'Net Pay': ''
+                    });
+                    
+                    // Get employees for this project
+                    const projectEmployees = PayrollModule.employees.filter(emp => emp.projectId === project.id);
+                    
+                    projectEmployees.forEach(emp => {
+                        const grossPay = PayrollModule.calculateGrossPay(emp);
+                        const deductions = PayrollModule.calculateDeductions(emp);
+                        const netPay = grossPay - deductions;
+                        
+                        payrollData.push({
+                            'Project': '',
+                            'Employee Name': emp.name,
+                            'Type': emp.type === 'monthly' ? 'Monthly' : 'Daily',
+                            'Rate/Salary': emp.type === 'monthly' ? emp.monthlySalary : emp.dailyRate,
+                            'Days Worked': emp.type === 'daily' ? emp.daysWorked : 'N/A',
+                            'Gross Pay': grossPay,
+                            'Deductions': deductions,
+                            'Net Pay': netPay
+                        });
+                    });
+                    
+                    // Add empty row between projects
+                    payrollData.push({
+                        'Project': '',
+                        'Employee Name': '',
+                        'Type': '',
+                        'Rate/Salary': '',
+                        'Days Worked': '',
+                        'Gross Pay': '',
+                        'Deductions': '',
+                        'Net Pay': ''
+                    });
+                });
+                
+                if (payrollData.length > 0) {
+                    const ws6 = XLSX.utils.json_to_sheet(payrollData);
+                    XLSX.utils.book_append_sheet(wb, ws6, 'Payroll');
+                }
+            }
+            
             // Check if there's any data to export
             if (wb.SheetNames.length === 0) {
                 Notification.warning('No data available to backup');
