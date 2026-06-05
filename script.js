@@ -2853,7 +2853,7 @@ const Documents = {
             return;
         }
         
-        const filename = docType === 'terms' ? 'TERMS.md' : 'NOTES.md';
+        const filename = docType === 'terms' ? 'docs/TERMS.md' : 'docs/NOTES.md';
         console.log('Loading document:', filename);
         
         try {

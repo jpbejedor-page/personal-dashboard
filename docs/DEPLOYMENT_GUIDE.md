@@ -36,6 +36,7 @@ Before you begin, ensure you have:
    https://docs.google.com/spreadsheets/d/[THIS_IS_YOUR_SHEET_ID]/edit
    ```
 
+
 #### Deploy Google Apps Script
 
 1. In your Google Sheet, click **Extensions > Apps Script**
