@@ -450,6 +450,151 @@ const FirebaseAPI = {
     
     offUsersChange() {
         this.getRef('users').off();
+    },
+    
+    // ===================================
+    // Payroll API
+    // ===================================
+    async getPayrollProjects() {
+        try {
+            const snapshot = await this.getRef('payroll/projects').once('value');
+            const data = snapshot.val();
+            const records = data ? Object.keys(data).map(key => ({
+                id: key,
+                ...data[key]
+            })) : [];
+            return { data: records };
+        } catch (error) {
+            console.error('Error getting payroll projects:', error);
+            throw error;
+        }
+    },
+    
+    async addPayrollProject(data) {
+        try {
+            const newRef = this.getRef('payroll/projects').push();
+            await newRef.set({
+                ...data,
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            });
+            return {
+                success: true,
+                data: { id: newRef.key, ...data }
+            };
+        } catch (error) {
+            console.error('Error adding payroll project:', error);
+            throw error;
+        }
+    },
+    
+    async updatePayrollProject(id, data) {
+        try {
+            await this.getRef(`payroll/projects/${id}`).update({
+                ...data,
+                updatedAt: firebase.database.ServerValue.TIMESTAMP
+            });
+            return { success: true };
+        } catch (error) {
+            console.error('Error updating payroll project:', error);
+            throw error;
+        }
+    },
+    
+    async deletePayrollProject(id) {
+        try {
+            // Delete project and all its employees
+            await this.getRef(`payroll/projects/${id}`).remove();
+            await this.getRef(`payroll/employees/${id}`).remove();
+            return { success: true };
+        } catch (error) {
+            console.error('Error deleting payroll project:', error);
+            throw error;
+        }
+    },
+    
+    async getProjectEmployees(projectId) {
+        try {
+            const snapshot = await this.getRef(`payroll/employees/${projectId}`).once('value');
+            const data = snapshot.val();
+            const records = data ? Object.keys(data).map(key => ({
+                id: key,
+                ...data[key]
+            })) : [];
+            return { data: records };
+        } catch (error) {
+            console.error('Error getting project employees:', error);
+            throw error;
+        }
+    },
+    
+    async addEmployee(projectId, data) {
+        try {
+            const newRef = this.getRef(`payroll/employees/${projectId}`).push();
+            await newRef.set({
+                ...data,
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            });
+            return {
+                success: true,
+                data: { id: newRef.key, ...data }
+            };
+        } catch (error) {
+            console.error('Error adding employee:', error);
+            throw error;
+        }
+    },
+    
+    async updateEmployee(projectId, employeeId, data) {
+        try {
+            await this.getRef(`payroll/employees/${projectId}/${employeeId}`).update({
+                ...data,
+                updatedAt: firebase.database.ServerValue.TIMESTAMP
+            });
+            return { success: true };
+        } catch (error) {
+            console.error('Error updating employee:', error);
+            throw error;
+        }
+    },
+    
+    async deleteEmployee(projectId, employeeId) {
+        try {
+            await this.getRef(`payroll/employees/${projectId}/${employeeId}`).remove();
+            return { success: true };
+        } catch (error) {
+            console.error('Error deleting employee:', error);
+            throw error;
+        }
+    },
+    
+    onPayrollProjectsChange(callback) {
+        this.getRef('payroll/projects').on('value', (snapshot) => {
+            const data = snapshot.val();
+            const records = data ? Object.keys(data).map(key => ({
+                id: key,
+                ...data[key]
+            })) : [];
+            callback(records);
+        });
+    },
+    
+    onProjectEmployeesChange(projectId, callback) {
+        this.getRef(`payroll/employees/${projectId}`).on('value', (snapshot) => {
+            const data = snapshot.val();
+            const records = data ? Object.keys(data).map(key => ({
+                id: key,
+                ...data[key]
+            })) : [];
+            callback(records);
+        });
+    },
+    
+    offPayrollProjectsChange() {
+        this.getRef('payroll/projects').off();
+    },
+    
+    offProjectEmployeesChange(projectId) {
+        this.getRef(`payroll/employees/${projectId}`).off();
     }
 };
 

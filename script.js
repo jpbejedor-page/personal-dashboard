@@ -1,453 +1,11 @@
 // ===================================
 // Personal Dashboard - Main JavaScript
 // ===================================
+// NOTE: Core modules (AppState, Utils, Notification, Modal, DataAPI) are now loaded from separate files
+// This file contains the remaining feature modules that haven't been extracted yet
 
-// ===================================
-// Global State Management
-// ===================================
-const AppState = {
-    currentUser: null,
-    currentModule: 'overview',
-    data: {
-        bloodSugar: [],
-        budget: [],
-        financial: [],
-        lending: [],
-        simpleLoans: [],
-        users: []
-    },
-    charts: {},
-    isLoading: false,
-    
-    // Check if current user has permission for a module
-    hasPermission(module, action = 'view') {
-        if (!this.currentUser) return false;
-        if (this.currentUser.role === 'admin') return true;
-        
-        const permissions = this.currentUser.permissions || {};
-        const modulePerms = permissions[module];
-        
-        if (!modulePerms) return false;
-        if (action === 'view') return modulePerms.view || modulePerms.modify;
-        if (action === 'modify') return modulePerms.modify;
-        
-        return false;
-    },
-    
-    // Check if current user is admin
-    isAdmin() {
-        return this.currentUser && this.currentUser.role === 'admin';
-    }
-};
-
-// ===================================
-// Utility Functions
-// ===================================
-const Utils = {
-    // Format date
-    formatDate(date, format = CONFIG.app.dateFormat) {
-        const d = new Date(date);
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        const hours = String(d.getHours()).padStart(2, '0');
-        const minutes = String(d.getMinutes()).padStart(2, '0');
-        
-        return format
-            .replace('YYYY', year)
-            .replace('MM', month)
-            .replace('DD', day)
-            .replace('HH', hours)
-            .replace('mm', minutes);
-    },
-    
-    // Format currency
-    formatCurrency(amount) {
-        const formatted = parseFloat(amount).toLocaleString('en-PH', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
-        
-        return CONFIG.app.currencyPosition === 'prefix' 
-            ? `${CONFIG.app.currency}${formatted}`
-            : `${formatted}${CONFIG.app.currency}`;
-    },
-    
-    // Generate unique ID
-    generateId() {
-        return Date.now().toString(36) + Math.random().toString(36).substr(2);
-    },
-    
-    // Debounce function
-    debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    },
-    
-    // Get current date in input format
-    getCurrentDate() {
-        return new Date().toISOString().split('T')[0];
-    },
-    
-    // Get current datetime in input format
-    getCurrentDateTime() {
-        const now = new Date();
-        const offset = now.getTimezoneOffset();
-        const localDate = new Date(now.getTime() - (offset * 60 * 1000));
-        return localDate.toISOString().slice(0, 16);
-    }
-,
-    
-    // Export data to XLSX
-    exportToXLSX(data, filename, sheetName = 'Sheet1') {
-        try {
-            // Create a new workbook
-            const wb = XLSX.utils.book_new();
-            
-            // Convert data to worksheet
-            const ws = XLSX.utils.json_to_sheet(data);
-            
-            // Add worksheet to workbook
-            XLSX.utils.book_append_sheet(wb, ws, sheetName);
-            
-            // Generate filename with timestamp
-            const timestamp = this.formatDate(new Date(), 'YYYY-MM-DD_HHmm');
-            const fullFilename = `${filename}_${timestamp}.xlsx`;
-            
-            // Write file
-            XLSX.writeFile(wb, fullFilename);
-            
-            return true;
-        } catch (error) {
-            console.error('Error exporting to XLSX:', error);
-            return false;
-        }
-    },
-    
-    // Backup all data to a single XLSX file with multiple sheets
-    backupAllData() {
-        try {
-            // Create a new workbook
-            const wb = XLSX.utils.book_new();
-            
-            // Blood Sugar Data
-            if (AppState.data.bloodSugar.length > 0) {
-                const bloodSugarData = AppState.data.bloodSugar.map(item => ({
-                    'Date & Time': this.formatDate(item.datetime, CONFIG.app.dateTimeFormat),
-                    'Meal Timing': item.mealTiming === 'fasting' ? 'Fasting' : `${item.mealTiming}h after meal`,
-                    'Level (mg/dL)': item.level,
-                    'Notes': item.notes || ''
-                }));
-                const ws1 = XLSX.utils.json_to_sheet(bloodSugarData);
-                XLSX.utils.book_append_sheet(wb, ws1, 'Blood Sugar');
-            }
-            
-            // Budget Data
-            if (AppState.data.budget.length > 0) {
-                const budgetData = [];
-                AppState.data.budget.forEach(budget => {
-                    budgetData.push({
-                        'Month': budget.monthKey,
-                        'Monthly Salary': parseFloat(budget.salary),
-                        'Category': 'TOTAL',
-                        'Amount': parseFloat(budget.salary),
-                        'Percentage': '100%'
-                    });
-                    
-                    if (budget.allocations && budget.allocations.length > 0) {
-                        budget.allocations.forEach(alloc => {
-                            budgetData.push({
-                                'Month': budget.monthKey,
-                                'Monthly Salary': '',
-                                'Category': alloc.category,
-                                'Amount': parseFloat(alloc.amount),
-                                'Percentage': `${((alloc.amount / budget.salary) * 100).toFixed(2)}%`
-                            });
-                        });
-                    }
-                    
-                    // Add empty row between budgets
-                    budgetData.push({
-                        'Month': '',
-                        'Monthly Salary': '',
-                        'Category': '',
-                        'Amount': '',
-                        'Percentage': ''
-                    });
-                });
-                const ws2 = XLSX.utils.json_to_sheet(budgetData);
-                XLSX.utils.book_append_sheet(wb, ws2, 'Budget');
-            }
-            
-            // Financial Data
-            if (AppState.data.financial.length > 0) {
-                const financialData = AppState.data.financial.map(item => ({
-                    'Date': this.formatDate(item.date),
-                    'Category': item.category,
-                    'Description': item.description,
-                    'Amount': parseFloat(item.amount),
-                    'Status': item.status
-                }));
-                const ws3 = XLSX.utils.json_to_sheet(financialData);
-                XLSX.utils.book_append_sheet(wb, ws3, 'Financial');
-            }
-            
-            // Lending Data
-            if (AppState.data.lending.length > 0) {
-                const lendingData = AppState.data.lending.map(item => {
-                    const principal = parseFloat(item.principal || 0);
-                    const interestRate = parseFloat(item.interestRate || 0);
-                    const totalDue = principal + (principal * interestRate / 100);
-                    const totalPaid = (item.payments || []).reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
-                    const balance = totalDue - totalPaid;
-                    
-                    return {
-                        'Borrower': item.borrower,
-                        'Start Date': this.formatDate(item.startDate),
-                        'Principal': principal,
-                        'Interest Rate': `${interestRate}%`,
-                        'Payment Terms': item.paymentTerms,
-                        'Total Due': totalDue,
-                        'Total Paid': totalPaid,
-                        'Balance': balance,
-                        'Status': balance <= 0 ? 'Fully Paid' : 'Active'
-                    };
-                });
-                const ws4 = XLSX.utils.json_to_sheet(lendingData);
-                XLSX.utils.book_append_sheet(wb, ws4, 'Lending');
-            }
-            
-            // Check if there's any data to export
-            if (wb.SheetNames.length === 0) {
-                Notification.warning('No data available to backup');
-                return false;
-            }
-            
-            // Generate filename with timestamp
-            const timestamp = this.formatDate(new Date(), 'YYYY-MM-DD_HHmm');
-            const filename = `dashboard_backup_${timestamp}.xlsx`;
-            
-            // Write file
-            XLSX.writeFile(wb, filename);
-            
-            return true;
-        } catch (error) {
-            console.error('Error backing up data:', error);
-            return false;
-        }
-    }
-};
-
-// ===================================
-// Notification System
-// ===================================
-const Notification = {
-    show(message, type = 'info', duration = 3000) {
-        const container = document.getElementById('notificationContainer');
-        const notification = document.createElement('div');
-        notification.className = `notification ${type}`;
-        
-        const icons = {
-            success: 'fa-check-circle',
-            error: 'fa-exclamation-circle',
-            warning: 'fa-exclamation-triangle',
-            info: 'fa-info-circle'
-        };
-        
-        notification.innerHTML = `
-            <i class="fas ${icons[type]}"></i>
-            <div class="notification-content">
-                <div class="notification-message">${message}</div>
-            </div>
-        `;
-        
-        container.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.style.animation = 'slideInRight 0.3s ease-out reverse';
-            setTimeout(() => notification.remove(), 300);
-        }, duration);
-    },
-    
-    success(message) {
-        this.show(message, 'success');
-    },
-    
-    error(message) {
-        this.show(message, 'error', 5000);
-    },
-    
-    warning(message) {
-        this.show(message, 'warning');
-    },
-    
-    info(message) {
-        this.show(message, 'info');
-    }
-};
-
-// ===================================
-// Modal System
-// ===================================
-const Modal = {
-    show(title, content, size = 'normal') {
-        const modal = document.getElementById('modalContainer');
-        const modalContent = modal.querySelector('.modal-content');
-        const modalTitle = document.getElementById('modalTitle');
-        const modalBody = document.getElementById('modalBody');
-        
-        // Remove any existing size classes
-        modalContent.classList.remove('large', 'normal');
-        
-        // Add size class
-        if (size === 'large') {
-            modalContent.classList.add('large');
-        }
-        
-        modalTitle.textContent = title;
-        modalBody.innerHTML = content;
-        modal.style.display = 'flex';
-        
-        // Prevent body scroll
-        document.body.style.overflow = 'hidden';
-    },
-    
-    hide() {
-        const modal = document.getElementById('modalContainer');
-        const modalContent = modal.querySelector('.modal-content');
-        modal.style.display = 'none';
-        
-        // Remove size classes
-        modalContent.classList.remove('large', 'normal');
-        
-        document.body.style.overflow = '';
-    }
-};
-
-// ===================================
-// Mock API (for offline/testing mode)
-// ===================================
-const MockAPI = {
-    data: {
-        bloodSugar: [],
-        budget: [],
-        financial: [],
-        lending: []
-    },
-    
-    async getBloodSugar() {
-        return { data: this.data.bloodSugar };
-    },
-    
-    async addBloodSugar(data) {
-        const record = { id: Utils.generateId(), ...data };
-        this.data.bloodSugar.push(record);
-        return { success: true, data: record };
-    },
-    
-    async updateBloodSugar(id, data) {
-        const index = this.data.bloodSugar.findIndex(item => item.id === id);
-        if (index !== -1) {
-            this.data.bloodSugar[index] = { ...this.data.bloodSugar[index], ...data };
-            return { success: true };
-        }
-        return { error: 'Record not found' };
-    },
-    
-    async deleteBloodSugar(id) {
-        this.data.bloodSugar = this.data.bloodSugar.filter(item => item.id !== id);
-        return { success: true };
-    },
-    
-    async getBudget() {
-        return { data: this.data.budget };
-    },
-    
-    async addBudget(data) {
-        const record = { id: Utils.generateId(), ...data };
-        this.data.budget.push(record);
-        return { success: true, data: record };
-    },
-    
-    async updateBudget(id, data) {
-        const index = this.data.budget.findIndex(item => item.id === id);
-        if (index !== -1) {
-            this.data.budget[index] = { ...this.data.budget[index], ...data };
-            return { success: true };
-        }
-        return { error: 'Record not found' };
-    },
-    
-    async deleteBudget(id) {
-        this.data.budget = this.data.budget.filter(item => item.id !== id);
-        return { success: true };
-    },
-    
-    async getFinancial() {
-        return { data: this.data.financial };
-    },
-    
-    async addFinancial(data) {
-        const record = { id: Utils.generateId(), ...data };
-        this.data.financial.push(record);
-        return { success: true, data: record };
-    },
-    
-    async updateFinancial(id, data) {
-        const index = this.data.financial.findIndex(item => item.id === id);
-        if (index !== -1) {
-            this.data.financial[index] = { ...this.data.financial[index], ...data };
-            return { success: true };
-        }
-        return { error: 'Record not found' };
-    },
-    
-    async deleteFinancial(id) {
-        this.data.financial = this.data.financial.filter(item => item.id !== id);
-        return { success: true };
-    },
-    
-    async getLending() {
-        return { data: this.data.lending };
-    },
-    
-    async addLending(data) {
-        const record = { id: Utils.generateId(), ...data };
-        this.data.lending.push(record);
-        return { success: true, data: record };
-    },
-    
-    async updateLending(id, data) {
-        const index = this.data.lending.findIndex(item => item.id === id);
-        if (index !== -1) {
-            this.data.lending[index] = { ...this.data.lending[index], ...data };
-            return { success: true };
-        }
-        return { error: 'Record not found' };
-    },
-    
-    async deleteLending(id) {
-        this.data.lending = this.data.lending.filter(item => item.id !== id);
-        return { success: true };
-    }
-};
-
-// Select API based on configuration
-let DataAPI;
-if (typeof CONFIG !== 'undefined' && CONFIG.databaseType === 'firebase' && typeof FirebaseAPI !== 'undefined') {
-    DataAPI = FirebaseAPI;
-    console.log('Using Firebase Realtime Database');
-} else {
-    DataAPI = MockAPI;
-    console.log('Using Mock API (offline mode)');
-}
+// DataAPI is now defined in js/core/data-api.js
+// AppState, Utils, Notification, Modal are loaded from js/core/
 
 // ===================================
 // Authentication Module
@@ -813,7 +371,7 @@ const Dashboard = {
         
         // If not admin, hide/disable modules based on permissions
         if (!isAdmin) {
-            const modules = ['overview', 'blood-sugar', 'budget', 'financial', 'lending'];
+            const modules = ['overview', 'blood-sugar', 'budget', 'financial', 'lending', 'payroll'];
             
             modules.forEach(module => {
                 const hasView = AppState.hasPermission(module, 'view');
@@ -884,6 +442,7 @@ const Dashboard = {
             financial: 'Financial',
             lending: 'Lending Business',
             documents: 'Documents',
+            payroll: 'Payroll System',
             users: 'User Management'
         };
         document.querySelector('.mobile-title').textContent = titles[moduleName] || 'Dashboard';
@@ -891,6 +450,16 @@ const Dashboard = {
         // Initialize Documents module if switching to it
         if (moduleName === 'documents' && typeof Documents !== 'undefined') {
             Documents.init();
+        }
+        
+        // Initialize Payroll module if switching to it
+        if (moduleName === 'payroll' && typeof PayrollModule !== 'undefined') {
+            PayrollModule.init();
+        }
+        
+        // Initialize User Management module if switching to it
+        if (moduleName === 'users' && typeof UserManagement !== 'undefined' && AppState.isAdmin()) {
+            UserManagement.loadData();
         }
         
         AppState.currentModule = moduleName;
@@ -1002,6 +571,7 @@ const Overview = {
         this.updateStats();
         this.initCharts();
         this.setupEventListeners();
+        this.fetchMarketData();
     },
     
     setupEventListeners() {
@@ -1010,6 +580,14 @@ const Overview = {
         if (rangeFilter) {
             rangeFilter.addEventListener('change', (e) => {
                 this.createBloodSugarChart(e.target.value);
+            });
+        }
+        
+        // Add event listener for IBM stock range filter
+        const ibmRangeFilter = document.getElementById('ibmStockRangeFilter');
+        if (ibmRangeFilter) {
+            ibmRangeFilter.addEventListener('change', (e) => {
+                this.fetchIBMStockData(e.target.value);
             });
         }
         
@@ -1022,6 +600,238 @@ const Overview = {
         }
     },
     
+    async fetchMarketData() {
+        // Fetch both IBM stock and currency data
+        await Promise.all([
+            this.fetchIBMStockData('1M'),
+            this.fetchPHPtoUSDRate()
+        ]);
+    },
+    
+    async fetchIBMStockData(range = '1M') {
+        try {
+            // Using Finnhub.io free tier API (60 API calls/minute)
+            // Get your free API key at: https://finnhub.io/register
+            const API_KEY = 'd8h5vm1r01qhjpmqoeh0d8h5vm1r01qhjpmqoehg'; // Replace with your free API key from finnhub.io
+            const symbol = 'IBM';
+            
+            // Calculate date range
+            const now = Math.floor(Date.now() / 1000);
+            const rangeMap = {
+                '1D': 1,
+                '5D': 5,
+                '1M': 30,
+                '3M': 90,
+                '6M': 180,
+                '1Y': 365
+            };
+            const days = rangeMap[range] || 30;
+            const from = now - (days * 24 * 60 * 60);
+            
+            // Fetch current quote
+            const quoteUrl = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${API_KEY}`;
+            const quoteResponse = await fetch(quoteUrl);
+            const quoteData = await quoteResponse.json();
+            
+            if (quoteData.error) {
+                throw new Error(quoteData.error);
+            }
+            
+            const currentPrice = quoteData.c; // Current price
+            const change = quoteData.d; // Change
+            const changePercent = quoteData.dp; // Change percent
+            
+            // Update UI
+            document.getElementById('ibmStockPrice').textContent = `$${currentPrice.toFixed(2)}`;
+            const changeElement = document.getElementById('ibmStockChange');
+            const changeText = change >= 0
+                ? `+$${change.toFixed(2)} (+${changePercent.toFixed(2)}%)`
+                : `$${change.toFixed(2)} (${changePercent.toFixed(2)}%)`;
+            changeElement.textContent = changeText;
+            changeElement.style.color = change >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
+            
+            // Fetch historical candles for chart
+            const resolution = range === '1D' ? '5' : 'D'; // 5 min for 1D, daily for others
+            const candleUrl = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=${resolution}&from=${from}&to=${now}&token=${API_KEY}`;
+            const candleResponse = await fetch(candleUrl);
+            const candleData = await candleResponse.json();
+            
+            if (candleData.s === 'ok' && candleData.t && candleData.c) {
+                this.createIBMStockChart(candleData.t, candleData.c, range);
+            } else {
+                console.warn('No historical data available, API response:', candleData);
+                // Create sample chart as fallback
+                this.createSampleStockChart(range);
+                Notification.info('Showing sample chart data. Historical data may not be available for this timeframe.', 5000);
+            }
+            
+        } catch (error) {
+            console.error('Error fetching IBM stock data:', error);
+            document.getElementById('ibmStockPrice').textContent = 'N/A';
+            document.getElementById('ibmStockChange').textContent = 'Get free API key from finnhub.io';
+            
+            // Show helpful message
+            if (error.message && error.message.includes('API key')) {
+                Notification.warning('Please add your free Finnhub API key to script.js. Get one at finnhub.io/register');
+            } else {
+                Notification.warning('Unable to fetch stock data. Check console for details.');
+            }
+        }
+    },
+    
+    createSampleStockChart(range) {
+        // Create sample data for demonstration when API data is unavailable
+        const canvas = document.getElementById('ibmStockChart');
+        if (!canvas) return;
+        
+        // Generate sample data points
+        const rangeMap = {
+            '1D': 78,    // 5-min intervals for 6.5 hours
+            '5D': 5,
+            '1M': 30,
+            '3M': 90,
+            '6M': 180,
+            '1Y': 365
+        };
+        const points = rangeMap[range] || 30;
+        const basePrice = 195;
+        
+        const timestamps = [];
+        const prices = [];
+        const now = Math.floor(Date.now() / 1000);
+        
+        for (let i = 0; i < points; i++) {
+            const timeOffset = range === '1D'
+                ? (i * 5 * 60) // 5 minutes in seconds
+                : (i * 24 * 60 * 60); // 1 day in seconds
+            timestamps.push(now - ((points - i) * timeOffset));
+            
+            // Generate realistic-looking price movement
+            const volatility = 2;
+            const trend = (i / points) * 3; // Slight upward trend
+            const randomWalk = (Math.random() - 0.5) * volatility;
+            prices.push(basePrice + trend + randomWalk);
+        }
+        
+        this.createIBMStockChart(timestamps, prices, range);
+    },
+    
+    async fetchPHPtoUSDRate() {
+        try {
+            // Using exchangerate-api.com (free tier available)
+            const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+            const data = await response.json();
+            
+            if (!data.rates || !data.rates.PHP) {
+                throw new Error('PHP rate not available');
+            }
+            
+            const phpRate = data.rates.PHP;
+            const lastUpdate = new Date(data.time_last_updated * 1000);
+            
+            // Update UI
+            document.getElementById('phpToUsdRate').textContent = `₱${phpRate.toFixed(4)}`;
+            document.getElementById('phpToUsdUpdate').textContent = `Updated: ${lastUpdate.toLocaleDateString()}`;
+            
+        } catch (error) {
+            console.error('Error fetching PHP to USD rate:', error);
+            document.getElementById('phpToUsdRate').textContent = 'N/A';
+            document.getElementById('phpToUsdUpdate').textContent = 'Unable to fetch rate';
+        }
+    },
+    
+    createIBMStockChart(timestamps, closes, range) {
+        const canvas = document.getElementById('ibmStockChart');
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        
+        // Prepare chart data - filter out null values
+        const validData = [];
+        for (let i = 0; i < timestamps.length; i++) {
+            if (closes[i] !== null) {
+                validData.push({
+                    timestamp: timestamps[i],
+                    price: closes[i]
+                });
+            }
+        }
+        
+        // Format labels based on range
+        const labels = validData.map(item => {
+            const date = new Date(item.timestamp * 1000);
+            if (range === '1D') {
+                return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            } else if (range === '5D' || range === '1M') {
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            } else {
+                return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+            }
+        });
+        
+        const prices = validData.map(item => item.price);
+        
+        // Destroy existing chart
+        if (AppState.charts.ibmStock) {
+            AppState.charts.ibmStock.destroy();
+        }
+        
+        // Create new chart
+        AppState.charts.ibmStock = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'IBM Stock Price (USD)',
+                    data: prices,
+                    borderColor: '#4facfe',
+                    backgroundColor: 'rgba(79, 172, 254, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: range === '1D' ? 1 : 2,
+                    pointHoverRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `Price: $${context.parsed.y.toFixed(2)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'Price (USD)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toFixed(2);
+                            }
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45,
+                            maxTicksLimit: range === '1D' ? 12 : 10
+                        }
+                    }
+                }
+            }
+        });
+    },
+    
     backupAllData() {
         const success = Utils.backupAllData();
         
@@ -1032,19 +842,23 @@ const Overview = {
         }
     },
     
-    updateStats() {
+    async updateStats() {
         // Latest Blood Sugar
         const bloodSugarData = AppState.data.bloodSugar;
-        if (bloodSugarData.length > 0) {
-            const latest = bloodSugarData[bloodSugarData.length - 1];
-            const levelElement = document.getElementById('latestBloodSugar');
-            const labelElement = levelElement.nextElementSibling;
+        const levelElement = document.getElementById('latestBloodSugar');
+        const labelElement = levelElement?.nextElementSibling;
+        
+        if (bloodSugarData.length > 0 && levelElement && labelElement) {
+            const latest = bloodSugarData.reduce((latestRecord, currentRecord) => {
+                const latestTime = new Date(latestRecord.datetime || latestRecord.date || 0).getTime();
+                const currentTime = new Date(currentRecord.datetime || currentRecord.date || 0).getTime();
+                return currentTime > latestTime ? currentRecord : latestRecord;
+            });
             
             if (latest.level) {
                 levelElement.textContent = latest.level;
-                // Format the datetime to show date and time
-                if (latest.datetime) {
-                    const date = new Date(latest.datetime);
+                if (latest.datetime || latest.date) {
+                    const date = new Date(latest.datetime || latest.date);
                     const formattedDate = date.toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -1066,7 +880,7 @@ const Overview = {
         
         // Financial stats (current month)
         const currentMonth = new Date().toISOString().slice(0, 7);
-        const monthlyFinancial = AppState.data.financial.filter(item => 
+        const monthlyFinancial = AppState.data.financial.filter(item =>
             item.date && item.date.startsWith(currentMonth)
         );
         
@@ -1094,6 +908,41 @@ const Overview = {
         const totalActiveLoans = activeLoans + activeSimpleLoans;
         
         document.getElementById('activeLoans').textContent = totalActiveLoans;
+        
+        // Payroll stats - aggregate all projects directly
+        const totalEmployeesElement = document.getElementById('totalEmployees');
+        const totalPayrollElement = document.getElementById('totalPayroll');
+        
+        if (totalEmployeesElement && totalPayrollElement && typeof FirebaseAPI !== 'undefined' && typeof PayrollModule !== 'undefined') {
+            try {
+                const projectsResponse = await FirebaseAPI.getPayrollProjects();
+                const projects = projectsResponse.data || [];
+                let allEmployees = [];
+                
+                for (const project of projects) {
+                    const employeesResponse = await FirebaseAPI.getProjectEmployees(project.id);
+                    const projectEmployees = employeesResponse.data || [];
+                    allEmployees = allEmployees.concat(projectEmployees);
+                }
+                
+                const totalEmployees = allEmployees.length;
+                const totalPayroll = allEmployees.reduce((total, employee) => {
+                    const grossPay = PayrollModule.calculateGrossPay(employee);
+                    const deductions = PayrollModule.calculateDeductions(employee);
+                    return total + (grossPay - deductions);
+                }, 0);
+                
+                totalEmployeesElement.textContent = totalEmployees;
+                totalPayrollElement.textContent = Utils.formatCurrency(totalPayroll);
+            } catch (error) {
+                console.error('Error loading overview payroll stats:', error);
+                totalEmployeesElement.textContent = '0';
+                totalPayrollElement.textContent = '₱0.00';
+            }
+        } else if (totalEmployeesElement && totalPayrollElement) {
+            totalEmployeesElement.textContent = '0';
+            totalPayrollElement.textContent = '₱0.00';
+        }
     },
     
     initCharts() {
@@ -3388,7 +3237,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ===================================
 const UserManagement = {
     init() {
-        this.renderTable();
+        this.loadData();
         this.setupEventListeners();
     },
     

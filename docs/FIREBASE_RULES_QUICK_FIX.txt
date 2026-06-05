@@ -1,0 +1,68 @@
+========================================
+FIREBASE RULES - QUICK FIX FOR PAYROLL
+========================================
+
+COPY AND PASTE THIS INTO FIREBASE CONSOLE:
+(Realtime Database > Rules tab)
+
+{
+  "rules": {
+    ".read": true,
+    ".write": true,
+    "bloodSugar": {
+      ".indexOn": ["datetime"]
+    },
+    "financial": {
+      ".indexOn": ["date", "category"]
+    },
+    "lending": {
+      ".indexOn": ["dueDate", "status"]
+    },
+    "budget": {
+      ".indexOn": ["month", "year"]
+    },
+    "simpleLoans": {
+      ".indexOn": ["status", "date"]
+    },
+    "payroll": {
+      "projects": {
+        ".indexOn": ["status", "createdAt"]
+      },
+      "employees": {
+        "$projectId": {
+          ".indexOn": ["type", "createdAt"]
+        }
+      }
+    },
+    "users": {
+      ".indexOn": ["username", "role"]
+    }
+  }
+}
+
+========================================
+STEPS TO APPLY:
+========================================
+
+1. Go to: https://console.firebase.google.com/
+2. Select your project: personal-dashboard-54d9f
+3. Click "Realtime Database" in left sidebar
+4. Click "Rules" tab at the top
+5. DELETE everything in the editor
+6. COPY the rules above (between the { })
+7. PASTE into the editor
+8. Click "Publish" button
+9. Wait for "Rules published successfully" message
+10. Refresh your dashboard and try again
+
+========================================
+IMPORTANT NOTES:
+========================================
+
+- These rules allow OPEN ACCESS (read: true, write: true)
+- This is fine for personal use
+- DO NOT use in production with sensitive data
+- The payroll section is now included with proper indexing
+- All your existing modules will continue to work
+
+========================================
