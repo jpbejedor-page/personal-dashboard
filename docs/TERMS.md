@@ -10,7 +10,7 @@
 3. Payment schedules must be agreed upon before loan disbursement
 
 ### Interest Rates
-- Standard loans: As agreed between parties (5% for 1 month, 7.5% for 2 months, 10% for 3 months)
+- Standard loans: As agreed between parties (5% for 1 month, 8% for 2 months, 12% for 3 months)
 - Variable loans: Interest rate may change periodically
 - Simple loans: Flexible terms, charges added as needed
 
