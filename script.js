@@ -3293,7 +3293,7 @@ const UserManagement = {
     formatPermissions(permissions) {
         if (!permissions) return '<span class="text-muted">No permissions</span>';
         
-        const modules = ['overview', 'blood-sugar', 'budget', 'financial', 'lending'];
+        const modules = ['overview', 'blood-sugar', 'budget', 'financial', 'lending', 'payroll'];
         const perms = [];
         
         modules.forEach(module => {
@@ -3455,7 +3455,8 @@ const UserManagement = {
             { id: 'blood-sugar', name: 'Blood Sugar', icon: 'fa-heartbeat' },
             { id: 'budget', name: 'Budget', icon: 'fa-money-bill-wave' },
             { id: 'financial', name: 'Financial', icon: 'fa-wallet' },
-            { id: 'lending', name: 'Lending', icon: 'fa-hand-holding-usd' }
+            { id: 'lending', name: 'Lending', icon: 'fa-hand-holding-usd' },
+            { id: 'payroll', name: 'Payroll System', icon: 'fa-money-check-alt' }
         ];
         
         return modules.map(module => `
@@ -3517,7 +3518,7 @@ const UserManagement = {
         // Build permissions object
         const permissions = {};
         if (role !== 'admin') {
-            const modules = ['overview', 'blood-sugar', 'budget', 'financial', 'lending'];
+            const modules = ['overview', 'blood-sugar', 'budget', 'financial', 'lending', 'payroll'];
             modules.forEach(module => {
                 const view = formData.get(`perm_${module}_view`);
                 const modify = formData.get(`perm_${module}_modify`);
@@ -3653,7 +3654,7 @@ const UserManagement = {
         // Build permissions object
         const permissions = {};
         if (role !== 'admin') {
-            const modules = ['overview', 'blood-sugar', 'budget', 'financial', 'lending'];
+            const modules = ['overview', 'blood-sugar', 'budget', 'financial', 'lending', 'payroll'];
             modules.forEach(module => {
                 const view = formData.get(`perm_${module}_view`);
                 const modify = formData.get(`perm_${module}_modify`);
