@@ -1117,8 +1117,17 @@ const Overview = {
 // ===================================
 const BloodSugar = {
     init() {
+        this.sortDataByLatest();
         this.renderTable();
         this.setupEventListeners();
+    },
+    
+    sortDataByLatest() {
+        AppState.data.bloodSugar.sort((a, b) => {
+            const timeA = new Date(a.datetime || a.date || 0).getTime();
+            const timeB = new Date(b.datetime || b.date || 0).getTime();
+            return timeB - timeA;
+        });
     },
     
     setupEventListeners() {
@@ -1160,6 +1169,7 @@ const BloodSugar = {
     
     renderTable() {
         const tbody = document.getElementById('bloodSugarTableBody');
+        this.sortDataByLatest();
         const data = AppState.data.bloodSugar;
         
         if (data.length === 0) {
@@ -1385,6 +1395,7 @@ const BloodSugar = {
                 Notification.success('Record added successfully');
             }
             
+            this.sortDataByLatest();
             this.renderTable();
             Overview.updateStats();
             Overview.createBloodSugarChart();
